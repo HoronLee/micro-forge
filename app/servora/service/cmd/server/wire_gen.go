@@ -38,11 +38,7 @@ func wireApp(confServer *conf.Server, discovery *conf.Discovery, confRegistry *c
 	grpcServer := server.NewGRPCServer(confServer, grpcMiddleware, logger)
 	authJWT := middleware.NewAuthMiddleware(app)
 	httpMiddleware := server.NewHTTPMiddleware(trace, telemetryMetrics, logger, authJWT)
-	db, err := data.NewDB(confData, logger)
-	if err != nil {
-		return nil, nil, err
-	}
-	entClient, err := data.NewEntClient(db, confData, app, logger)
+	entClient, err := data.NewDBClient(confData, app, logger)
 	if err != nil {
 		return nil, nil, err
 	}

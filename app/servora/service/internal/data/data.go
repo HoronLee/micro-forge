@@ -1,9 +1,9 @@
 package data
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
-	"time"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -14,17 +14,14 @@ import (
 	"github.com/horonlee/servora/pkg/redis"
 	"github.com/horonlee/servora/pkg/transport/client"
 
-	"github.com/glebarez/sqlite"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/wire"
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-// ProviderSet is data providers.
-var ProviderSet = wire.NewSet(registry.NewDiscovery, NewDB, NewEntClient, NewRedis, NewData, NewAuthRepo, NewUserRepo, NewTestRepo)
+var ProviderSet = wire.NewSet(registry.NewDiscovery, NewDBClient, NewRedis, NewData, NewAuthRepo, NewUserRepo, NewTestRepo)
 
-// Data .
 type Data struct {
 	entClient *ent.Client
 	log       *logger.Helper
@@ -32,7 +29,6 @@ type Data struct {
 	redis     *redis.Client
 }
 
-// NewData .
 func NewData(entClient *ent.Client, c *conf.Data, l logger.Logger, client client.Client, redisClient *redis.Client) (*Data, func(), error) {
 	_ = c
 	cleanup := func() {
@@ -49,71 +45,47 @@ func NewData(entClient *ent.Client, c *conf.Data, l logger.Logger, client client
 	}, cleanup, nil
 }
 
-func NewEntClient(db *gorm.DB, cfg *conf.Data, app *conf.App, l logger.Logger) (*ent.Client, error) {
-	dbConn, err := db.DB()
+func NewDBClient(cfg *conf.Data, app *conf.App, l logger.Logger) (*ent.Client, error) {
+	driver, err := newEntDriver(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	opts := []ent.Option{
-		ent.Driver(entsql.OpenDB(entDialect(cfg.Database.GetDriver()), dbConn)),
+		ent.Driver(driver),
 		ent.Log(logger.EntLogFuncFrom(l, "ent/data/servora-service")),
 	}
 	if strings.EqualFold(app.GetEnv(), "dev") {
 		opts = append(opts, ent.Debug())
 	}
 
-	client := ent.NewClient(opts...)
-	return client, nil
+	return ent.NewClient(opts...), nil
 }
 
-func entDialect(driver string) string {
-	switch strings.ToLower(driver) {
-	case "mysql":
-		return dialect.MySQL
-	case "postgres", "postgresql":
-		return dialect.Postgres
-	default:
-		return dialect.SQLite
-	}
-}
+func newEntDriver(cfg *conf.Data) (*entsql.Driver, error) {
+	var driverName string
+	var entDialect string
 
-func NewDB(cfg *conf.Data, l logger.Logger) (*gorm.DB, error) {
-	gormLogger := logger.GormLoggerFrom(l, "gorm/data/servora-service")
-	dbLog := logger.NewHelper(l,
-		logger.WithModule("data/db/servora-service"),
-		logger.WithField("operation", "NewDB"),
-	)
-
-	var dialector gorm.Dialector
 	switch strings.ToLower(cfg.Database.GetDriver()) {
 	case "mysql":
-		dialector = mysql.Open(cfg.Database.GetSource())
-	case "sqlite":
-		dialector = sqlite.Open(cfg.Database.GetSource())
+		driverName = "mysql"
+		entDialect = dialect.MySQL
 	case "postgres", "postgresql":
-		dialector = postgres.Open(cfg.Database.GetSource())
+		driverName = "postgres"
+		entDialect = dialect.Postgres
+	case "sqlite":
+		driverName = "sqlite3"
+		entDialect = dialect.SQLite
 	default:
-		return nil, errors.New("connect db fail: unsupported db driver")
+		return nil, errors.New("unsupported db driver: " + cfg.Database.GetDriver())
 	}
 
-	var db *gorm.DB
-	var err error
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		db, err = gorm.Open(dialector, &gorm.Config{
-			Logger: gormLogger,
-		})
-		if err == nil {
-			return db, nil
-		}
-		if i < maxRetries-1 {
-			delay := time.Duration(1<<uint(i)) * time.Second
-			dbLog.Warnf("database connection failed (attempt %d/%d), retrying in %v: %v", i+1, maxRetries, delay, err)
-			time.Sleep(delay)
-		}
+	db, err := sql.Open(driverName, cfg.Database.GetSource())
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+
+	return entsql.OpenDB(entDialect, db), nil
 }
 
 func NewRedis(cfg *conf.Data, l logger.Logger) (*redis.Client, func(), error) {
