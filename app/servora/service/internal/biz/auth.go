@@ -11,7 +11,7 @@ import (
 	"github.com/horonlee/servora/api/gen/go/conf/v1"
 	"github.com/horonlee/servora/app/servora/service/internal/biz/entity"
 	dataent "github.com/horonlee/servora/app/servora/service/internal/data/ent"
-	"github.com/horonlee/servora/pkg/helpers/hash"
+	"github.com/horonlee/servora/pkg/helpers"
 	jwtpkg "github.com/horonlee/servora/pkg/jwt"
 	"github.com/horonlee/servora/pkg/logger"
 )
@@ -155,7 +155,7 @@ func (uc *AuthUsecase) LoginByEmailPassword(ctx context.Context, user *entity.Us
 		uc.log.Warnf("user %s does not exist", user.Email)
 		return nil, authpb.ErrorUserNotFound("user %s does not exist", user.Email)
 	}
-	if !hash.BcryptCheck(user.Password, foundUser.Password) {
+	if !helpers.BcryptCheck(user.Password, foundUser.Password) {
 		return nil, authpb.ErrorIncorrectPassword("incorrect password for user: %s", user.Email)
 	}
 

@@ -1,5 +1,4 @@
-// Package hash 哈希操作类
-package hash
+package helpers
 
 import (
 	"golang.org/x/crypto/bcrypt"

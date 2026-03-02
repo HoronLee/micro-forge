@@ -9,7 +9,7 @@ import (
 	"github.com/horonlee/servora/app/servora/service/internal/biz/entity"
 	"github.com/horonlee/servora/app/servora/service/internal/data/ent"
 	"github.com/horonlee/servora/app/servora/service/internal/data/ent/user"
-	"github.com/horonlee/servora/pkg/helpers/hash"
+	"github.com/horonlee/servora/pkg/helpers"
 	"github.com/horonlee/servora/pkg/logger"
 	"github.com/horonlee/servora/pkg/mapper"
 )
@@ -29,8 +29,8 @@ func NewUserRepo(data *Data, l logger.Logger) biz.UserRepo {
 }
 
 func (r *userRepo) SaveUser(ctx context.Context, user *entity.User) (*entity.User, error) {
-	if !hash.BcryptIsHashed(user.Password) {
-		bcryptPassword, err := hash.BcryptHash(user.Password)
+	if !helpers.BcryptIsHashed(user.Password) {
+		bcryptPassword, err := helpers.BcryptHash(user.Password)
 		if err != nil {
 			return nil, err
 		}
@@ -72,8 +72,8 @@ func (r *userRepo) DeleteUser(ctx context.Context, user *entity.User) (*entity.U
 }
 
 func (r *userRepo) UpdateUser(ctx context.Context, user *entity.User) (*entity.User, error) {
-	if !hash.BcryptIsHashed(user.Password) {
-		bcryptPassword, err := hash.BcryptHash(user.Password)
+	if !helpers.BcryptIsHashed(user.Password) {
+		bcryptPassword, err := helpers.BcryptHash(user.Password)
 		if err != nil {
 			return nil, err
 		}
