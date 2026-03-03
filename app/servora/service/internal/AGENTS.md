@@ -761,40 +761,17 @@ func NewGRPCServer(...) *grpc.Server {
 
 **步骤**：
 
-1. **配置生成器**
-```go
-// cmd/genDao/genDao.go
-//go:build ignore
-
-package main
-
-import (
-    "gorm.io/gen"
-    "gorm.io/driver/mysql"
-    "gorm.io/gorm"
-)
-
-func main() {
-    g := gen.NewGenerator(gen.Config{
-        OutPath: "./internal/data/gorm/dao",  // DAO 输出目录
-        OutFile: "./internal/data/gorm/po",   // PO 输出目录
-        Mode:    gen.WithoutContext | gen.WithDefaultQuery,
-    })
-
-    db, _ := gorm.Open(mysql.Open("root:password@tcp(localhost:3306)/servora"))
-    g.UseDB(db)
-
-    // 生成所有表
-    g.ApplyBasic(g.GenerateAllTable()...)
-
-    g.Execute()
-}
-```
-
-2. **运行生成**
+1. **运行生成**
 ```bash
+# 在服务目录下运行
 cd /Users/horonlee/projects/go/servora/app/servora/service
 make gen.gorm
+
+# 或通过根目录 svr CLI 工具直接调用
+svr gen gorm servora
+
+# 预览将要生成的路径（不实际执行）
+svr gen gorm servora --dry-run
 ```
 
 3. **使用生成的 DAO**

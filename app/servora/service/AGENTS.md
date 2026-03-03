@@ -24,8 +24,6 @@ app/servora/service/
 │   │   ├── config.go      # 配置加载逻辑
 │   │   ├── wire.go        # Wire 依赖注入配置（手动编辑）
 │   │   └── wire_gen.go    # Wire 生成代码（自动生成，不要编辑）
-│   └── genDao/            # GORM GEN 代码生成工具
-│       └── genDao.go      # DAO 生成器入口
 ├── internal/              # 内部实现（DDD 分层架构）
 │   ├── biz/              # 业务逻辑层（UseCase 层）
 │   │   ├── biz.go        # ProviderSet 定义
@@ -906,42 +904,25 @@ GORM GEN 是 GORM 的代码生成器，自动生成类型安全的 DAO 和 PO。
 
 ### 配置和生成
 
-**生成器配置**（`cmd/genDao/genDao.go`）：
-```go
-//go:build ignore
-
-package main
-
-import (
-    "gorm.io/gen"
-    "gorm.io/driver/mysql"
-    "gorm.io/gorm"
-)
-
-func main() {
-    g := gen.NewGenerator(gen.Config{
-        OutPath: "./internal/data/gorm/dao",  // DAO 输出目录
-        OutFile: "./internal/data/gorm/po",   // PO 输出目录
-        Mode:    gen.WithoutContext | gen.WithDefaultQuery,
-    })
-
-    // 连接数据库
-    db, _ := gorm.Open(mysql.Open("root:password@tcp(localhost:3306)/servora"))
-    g.UseDB(db)
-
-    // 生成所有表
-    g.ApplyBasic(g.GenerateAllTable()...)
-
-    g.Execute()
-}
-```
-
-**运行生成**：
+**生成方式**：
 ```bash
-cd /Users/horonlee/projects/go/servora/app/servora/service
+# 在项目根目录运行
+svr gen gorm servora
+
+# 或在服务目录下
 make gen.gorm
-make gen.ent
 ```
+
+> `make gen.gorm` 内部实际调用 `svr gen gorm servora` 来执行代码生成。
+>
+> 更多用法：
+> ```bash
+> # 预览将要生成的路径，不实际执行生成
+> svr gen gorm servora --dry-run
+>
+> # 交互式选择服务（无参数时进入交互模式）
+> svr gen gorm
+> ```
 
 ### 使用生成的 DAO
 

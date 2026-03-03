@@ -896,46 +896,24 @@ web/
 **步骤**：
 
 1. **配置 GORM GEN**
-```go
-// cmd/genDao/genDao.go
-//go:build ignore
 
-package main
+通过 `svr gen gorm` 命令生成 GORM DAO/PO 代码，该工具由项目 `cmd/svr/` 提供：
 
-import (
-    "gorm.io/gen"
-    "gorm.io/driver/mysql"
-    "gorm.io/gorm"
-)
+```bash
+# 为指定服务生成 GORM DAO/PO
+svr gen gorm servora
 
-func main() {
-    g := gen.NewGenerator(gen.Config{
-        OutPath:      "./internal/data/gorm/dao",  // DAO 输出目录
-        ModelPkgPath: "./internal/data/gorm/po",   // PO 输出目录
-        Mode:         gen.WithDefaultQuery | gen.WithQueryInterface,
-    })
+# 预览生成路径（不实际生成）
+svr gen gorm servora --dry-run
 
-    // 连接数据库
-    db, _ := gorm.Open(mysql.Open("root:password@tcp(localhost:3306)/servora"))
-    g.UseDB(db)
-
-    // 生成所有表
-    g.ApplyBasic(g.GenerateAllTable()...)
-
-    // 或指定表
-    g.ApplyBasic(
-        g.GenerateModel("users"),
-        g.GenerateModel("products"),
-    )
-
-    g.Execute()
-}
+# 无参数进入交互式服务选择
+svr gen gorm
 ```
 
 2. **运行生成**
 ```bash
 cd app/servora/service
-make gen.gorm  # 或 go run ./cmd/genDao -conf ./configs
+make gen.gorm  # 内部调用 svr gen gorm
 make gen.ent  # 生成 Ent 代码（schema -> ent）
 ```
 

@@ -128,11 +128,10 @@ clean:
 # generate code
 gen: wire api openapi gen.ent
 
-# generate GORM GEN PO and DAO code, if genDao cmd exist
+# generate GORM GEN PO and DAO code via centralized svr CLI
 gen.gorm:
-ifneq ("$(wildcard ./cmd/genDao)","")
-	@go run ./cmd/genDao -conf ./configs
-endif
+	@echo "Generating GORM DAO/PO..."
+	@cd $(MKFILE_DIR) && go run ./cmd/svr gen gorm $(SERVICE_NAME)
 
 # generate Ent code, if internal/data/generate.go exists
 gen.ent:

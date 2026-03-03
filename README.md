@@ -50,14 +50,6 @@ servora 是一个基于 **Go Kratos v2** 的微服务快开框架，采用 **DDD
 └── Makefile                     # 根目录统一入口
 ```
 
-## 🧰 共享工具（pkg/helpers）
-
-- `pkg/helpers/helpers.go`：时间耗时格式化（`MicrosecondsStr`）
-- `pkg/helpers/hash.go`：密码哈希能力，统一由 `helpers` 包对外提供
-  - `BcryptHash()`：生成 bcrypt 哈希
-  - `BcryptCheck()`：校验明文与哈希
-  - `BcryptIsHashed()`：判断字符串是否已是 bcrypt 哈希
-
 ## 🚀 快速开始
 
 ### 1) 前置要求
@@ -162,9 +154,20 @@ make app
 make gen
 make wire
 make gen.ent
-make gen.gorm
+make gen.gorm    # 生成 GORM DAO/PO（内部调用 svr gen gorm）
 make openapi
 ```
+
+### svr 命令行工具
+
+```bash
+# GORM GEN 代码生成
+svr gen gorm <服务名...>          # 为指定服务生成 GORM DAO/PO
+svr gen gorm servora --dry-run   # 预览生成路径（不实际生成）
+svr gen gorm                     # 无参数进入交互式服务选择
+```
+
+退出码：全部成功 = 0，存在失败 = 1
 
 ### 前端命令（`web/`）
 

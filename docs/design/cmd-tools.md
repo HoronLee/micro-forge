@@ -465,10 +465,10 @@ gen.gorm:
 ### 迁移路径
 
 #### Phase 1：实现 `svr gen gorm`
-- [ ] 实现配置加载逻辑（复用 `pkg/bootstrap/config/loader.go`）
-- [ ] 实现 GORM GEN 生成器封装
-- [ ] 实现命令行接口
-- [ ] 添加错误处理和用户友好提示
+- [x] 实现配置加载逻辑（复用 `pkg/bootstrap/config/loader.go`）
+- [x] 实现 GORM GEN 生成器封装
+- [x] 实现命令行接口
+- [x] 添加错误处理和用户友好提示
 
 #### Phase 2：更新服务
 - [ ] 在 `app.mk` 中更新 `gen.gorm` 目标调用 `svr gen gorm`
@@ -633,9 +633,9 @@ $ svr gen gorm servora --dry-run
 
 #### v1
 
-- [ ] 完成 `svr` 根命令骨架与 `gen/new` 分组
+- [x] 完成 `svr` 根命令骨架与 `gen/new` 分组
 - [ ] 完成 `svr gen dao`（Ent-only）
-- [ ] 完成 `svr gen gorm`（中心化 GORM GEN 生成）
+- [x] 完成 `svr gen gorm`（中心化 GORM GEN 生成）
 - [ ] 完成 `svr new api` 与 `svr new svc` 的最小模板生成
 
 #### v1.5

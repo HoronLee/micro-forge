@@ -16,11 +16,6 @@ type User struct {
 	Name      string    `gorm:"column:name;not null" json:"name"`
 	Email     string    `gorm:"column:email;not null" json:"email"`
 	Password  string    `gorm:"column:password;not null" json:"password"`
-	Phone     *string   `gorm:"column:phone;default:NULL" json:"phone"`
-	Avatar    *string   `gorm:"column:avatar;default:NULL" json:"avatar"`
-	Bio       *string   `gorm:"column:bio;default:NULL" json:"bio"`
-	Location  *string   `gorm:"column:location;default:NULL" json:"location"`
-	Website   *string   `gorm:"column:website;default:NULL" json:"website"`
 	Role      string    `gorm:"column:role;not null;default:user" json:"role"`
 	CreatedAt time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`

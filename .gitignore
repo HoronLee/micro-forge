@@ -46,7 +46,6 @@ tmp/
 *.swp
 
 # AI tools
-openspec/
 .kilocode/
 .kiro/
 .sisyphus/
