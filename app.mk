@@ -150,7 +150,7 @@ endif
 # generate protobuf api code
 api:
 	@cd ../../../api && \
-	buf generate
+	buf generate --template buf.go.gen.yaml
 
 # generate protobuf api OpenAPI v3 docs
 openapi:
