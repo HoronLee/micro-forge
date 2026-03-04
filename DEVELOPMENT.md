@@ -155,7 +155,7 @@ api/protos/
 | `make build_only` | Build without code generation |
 | `make all` | Generate and build all services |
 | `make test` | Run tests |
-| `make lint` | Run linter |
+| `make lint.go` | Run golang linter |
 | `make clean` | Clean build artifacts |
 
 ### Service Makefile (app/{service}/service/)

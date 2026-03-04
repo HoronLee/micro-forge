@@ -62,7 +62,7 @@ INFRA_SERVICES := consul db redis otel-collector jaeger loki prometheus grafana
 # MAIN TARGETS
 # ============================================================================
 
-.PHONY: help env init plugin cli dep vendor test cover vet lint
+.PHONY: help env init plugin cli dep vendor test cover vet lint.go lint.proto
 .PHONY: wire ent gen api api-go api-ts openapi build build_only all clean
 .PHONY: compose.build compose.up compose.rebuild compose.down compose.ps compose.logs
 .PHONY: compose.dev compose.dev.build compose.dev.up compose.dev.restart compose.dev.ps compose.dev.down compose.dev.logs
@@ -122,8 +122,8 @@ cover:
 vet:
 	@go vet ./...
 
-# run lint
-lint:
+# run golang lint
+lint.go:
 	@golangci-lint run
 
 # generate wire code for all services
@@ -169,7 +169,7 @@ openapi:
 	@echo "$(GREEN)✓ OpenAPI documentation generated$(RESET)"
 
 # lint protobuf files
-lint-proto:
+lint.proto:
 	@echo "$(CYAN)Linting protobuf files...$(RESET)"
 	@cd $(API_DIR) && buf lint
 	@echo "$(GREEN)✓ Proto lint complete$(RESET)"
