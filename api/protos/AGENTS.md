@@ -17,6 +17,7 @@
 | `sayhello/` | 独立微服务示例协议定义 | `sayhello.proto` |
 | `test/` | 测试与演示服务协议定义 | `test.proto` (gRPC) |
 | `conf/` | 服务内部配置结构定义 | `conf.proto` |
+| `template/` | `svr new api` 脚手架模板（可自定义覆盖） | `template.proto`, `template_doc.proto` |
 
 ## Proto 文件编写规范
 
@@ -44,7 +45,26 @@ make gen
 - **buf.lock**: 锁定依赖版本。
 - **buf.gen.yaml**: (位于父目录 `api/`) 定义生成插件（go, go-grpc, go-http, go-errors, openapi）。
 
+## 脚手架快速创建
+
+使用 `svr new api` 可以一键生成符合 servora proto 规范的骨架文件：
+
+```bash
+# 在项目根目录执行
+svr new api user
+svr new api say_hello
+svr new api billing.invoice   # 生成嵌套目录 billing/invoice/service/v1/
+```
+
+生成规则：
+- 目录：`api/protos/<name>/service/v1/`（点分段映射为多级目录）
+- 文件：`<name>.proto` + `<name>_doc.proto`（点分段以 `_` 拼接为文件名）
+- package：`<name>.service.v1`（保留点分，与目录结构对应）
+
+**自定义模板**：将 `template/service/v1/template.proto` 和 `template_doc.proto` 修改为项目偏好的样板，`svr new api` 会直接使用此目录作为模板源。也可通过 `--template` 标志指定任意目录。
+
 ## 注意事项
 - **不可手动修改生成代码**: `api/gen/go/` 下的所有内容都是自动生成的。
 - **版本控制**: 遵循 `v1`, `v2` 等版本化路径，确保 API 的向后兼容性。
 - **文档**: 使用 `*_doc.proto` 或在 message/service 上方编写详细注释，以便自动生成高质量的 OpenAPI 文档。
+- **模板目录**: `template/service/v1/` 是脚手架模板，不参与 buf 正式代码生成，不应被引用为业务 proto 依赖。

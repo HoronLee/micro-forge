@@ -32,6 +32,7 @@ servora 是一个基于 **Go Kratos v2** 的微服务快开框架，采用 **DDD
 .
 ├── api/                         # Proto 定义、Buf 配置、生成代码
 │   ├── protos/
+│   │   └── template/            # svr new api 脚手架模板（可自定义）
 │   ├── gen/go/
 │   ├── buf.gen.yaml
 │   ├── buf.*.go.gen.yaml
@@ -40,6 +41,8 @@ servora 是一个基于 **Go Kratos v2** 的微服务快开框架，采用 **DDD
 ├── app/
 │   ├── servora/service/         # 主服务（DDD 分层）
 │   └── sayhello/service/        # 独立示例服务
+├── cmd/
+│   └── svr/                     # CLI 工具（svr gen gorm / svr new api）
 ├── pkg/                         # 项目共享库
 ├── web/                         # Vue 3 前端项目（根目录）
 ├── manifests/                   # 可观测性与证书等基础设施清单
@@ -94,11 +97,12 @@ make compose.dev.down
 
 推荐顺序：
 
-1. 修改/新增 `.proto`（`api/protos/`）
-2. 运行 `make gen` 同步生成代码
-3. 按 DDD 分层实现：`internal/service -> internal/biz -> internal/data`
-4. 若修改了 Wire 依赖图，运行 `make wire`（或直接 `make gen`）
-5. 运行 `make test`、`make lint` 验证质量
+1. 使用 `svr new api <name>` 生成 proto 骨架（`api/protos/<name>/service/v1/`）
+2. 修改/完善生成的 `.proto` 文件
+3. 运行 `make gen` 同步生成代码
+4. 按 DDD 分层实现：`internal/service -> internal/biz -> internal/data`
+5. 若修改了 Wire 依赖图，运行 `make wire`（或直接 `make gen`）
+6. 运行 `make test`、`make lint` 验证质量
 
 ## 🛠️ 常用命令
 
@@ -165,9 +169,18 @@ make openapi
 svr gen gorm <服务名...>          # 为指定服务生成 GORM DAO/PO
 svr gen gorm servora --dry-run   # 预览生成路径（不实际生成）
 svr gen gorm                     # 无参数进入交互式服务选择
+
+# Proto API 脚手架
+svr new api <name>               # 在 api/protos/ 下创建 proto 骨架
+svr new api say_hello            # 支持 snake_case
+svr new api billing.invoice      # 支持点分层级（生成嵌套目录）
+svr new api user --output <dir>  # 指定输出根目录
+svr new api user --template <dir> # 指定自定义模板目录
 ```
 
 退出码：全部成功 = 0，存在失败 = 1
+
+> **注意**：`svr` 命令须在项目根目录执行。
 
 ### 前端命令（`web/`）
 

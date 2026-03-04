@@ -1,0 +1,25 @@
+// based on https://grpc.io/docs/guides/concepts.html
+syntax = "proto3";
+
+package template.service.v1;
+
+import "buf/validate/validate.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "TemplateProtoV1";
+option java_package = "dev.servora.api.template.v1";
+
+// TemplateService 定义一个简单的服务
+service TemplateService {
+  rpc Hello(HelloRequest) returns (HelloResponse) {}
+}
+
+// HelloRequest 是服务的请求消息
+message HelloRequest {
+  string greeting = 1 [(buf.validate.field).required = true];
+}
+
+// HelloResponse 是服务的响应消息
+message HelloResponse {
+  string reply = 1;
+}

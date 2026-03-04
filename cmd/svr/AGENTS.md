@@ -18,13 +18,14 @@
 ```bash
 svr
 ├── gen
-│   └── gorm <service-name...> [--dry-run]   # GORM GEN 代码生成
-├── completion                                 # Shell 自动补全（Cobra 内置）
-├── help                                       # 帮助信息
+│   └── gorm <service-name...> [--dry-run]           # GORM GEN 代码生成
+├── new
+│   └── api <name> [--template dir] [--output dir]   # 创建 proto API 骨架
+├── completion                                         # Shell 自动补全（Cobra 内置）
+├── help                                               # 帮助信息
 └── (未来扩展)
-    ├── gen dao                                # Ent 代码生成
-    ├── new api                                # 创建 API/proto 骨架
-    └── new svc                                # 创建微服务骨架
+    ├── gen dao                                        # Ent 代码生成
+    └── new svc                                        # 创建微服务骨架
 ```
 
 ## 目录结构
@@ -37,9 +38,12 @@ cmd/svr/
     ├── root/
     │   └── root.go                  # 根命令（注册所有命令组）
     ├── cmd/
-    │   └── gen/
-    │       ├── gen.go               # gen 命令组注册
-    │       └── gorm.go              # gorm 子命令（批量生成 + 交互模式）
+    │   ├── gen/
+    │   │   ├── gen.go               # gen 命令组注册
+    │   │   └── gorm.go              # gorm 子命令（批量生成 + 交互模式）
+    │   └── new/
+    │       ├── new.go               # new 命令组注册
+    │       └── api.go               # new api 子命令（proto 脚手架生成）
     ├── discovery/
     │   └── config.go                # 服务发现与配置加载
     ├── generator/
@@ -52,7 +56,7 @@ cmd/svr/
 
 ### `internal/root/` - 根命令
 - 定义 `svr` 根命令
-- 注册所有命令组（`gen.Register(rootCmd)`）
+- 注册所有命令组（`gen.Register(rootCmd)`、`new.Register(rootCmd)`）
 - 暴露 `Execute()` 入口
 
 ### `internal/cmd/` - 命令实现
@@ -66,6 +70,16 @@ cmd/svr/
 - 批量执行，失败不中断，最终汇总
 - 4 种错误分类：`service-not-found` / `config-invalid` / `db-connect-failed` / `generation-failed`
 - 退出码：全成功=0，存在失败=1
+
+**new/new.go**：注册 `new` 命令组
+**new/api.go**：实现 `svr new api` 子命令
+- 输入格式：snake_case，支持点号层级（`test`、`say_hello`、`billing.invoice`）
+- 二级模板查找：`--template` 标志 → `./api/protos/template/service/v1/`（项目根相对路径）
+- 感知上下文的命名替换：`template` → snake、`Template` → PascalCase、`TEMPLATE` → UPPER
+- proto package 行保留点分形式（`billing.invoice.service.v1`）符合 buf 目录映射规范
+- 目标目录已存在时报错退出（exit code 1），适合 CI 使用
+- 标志：`--template <dir>`、`--output <dir>`（默认 `./api/protos/`）
+- 模板缺失时输出带 hint 的错误：提示从项目根目录执行或使用 `--template`
 
 ### `internal/discovery/` - 服务发现
 - `LoadServiceConfig()` — 加载服务的 Bootstrap 配置（复用 `pkg/bootstrap/config/loader.LoadBootstrap()`）
@@ -170,10 +184,17 @@ ux.PrintFailureDetail("badservice", "service-not-found", "not found at app/badse
 # 编译
 go build ./cmd/svr/...
 
-# 运行
+# gen gorm
 go run ./cmd/svr gen gorm servora
 go run ./cmd/svr gen gorm servora --dry-run
 go run ./cmd/svr gen gorm  # 交互模式
+
+# new api
+go run ./cmd/svr new api user
+go run ./cmd/svr new api say_hello
+go run ./cmd/svr new api billing.invoice
+go run ./cmd/svr new api user --output /custom/path
+go run ./cmd/svr new api user --template /custom/templates
 
 # 通过 make（在服务目录下）
 cd app/servora/service && make gen.gorm

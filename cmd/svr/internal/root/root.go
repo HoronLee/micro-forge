@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/horonlee/servora/cmd/svr/internal/cmd/gen"
+	"github.com/horonlee/servora/cmd/svr/internal/cmd/new"
 )
 
 var rootCmd = &cobra.Command{
@@ -14,6 +15,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	gen.Register(rootCmd)
+	new.Register(rootCmd)
 }
 
 func Execute() error {
