@@ -3,72 +3,72 @@ version: v2
 clean: true
 
 managed:
-  enabled: true
+    enabled: true
 
-  disable:
-    - module: buf.build/googleapis/googleapis
-    - module: buf.build/bufbuild/protovalidate
-    - module: buf.build/kratos/apis
-    - module: buf.build/gnostic/gnostic
-    # 保留 conf proto 的原始 go_package 设置
-    - file_option: go_package
-      path: conf/v1/conf.proto
+    disable:
+        - module: buf.build/googleapis/googleapis
+        - module: buf.build/bufbuild/protovalidate
+        - module: buf.build/kratos/apis
+        - module: buf.build/gnostic/gnostic
+        # 保留 conf proto 的原始 go_package 设置
+        - file_option: go_package
+          path: conf/v1/conf.proto
 
-  override:
-    - file_option: go_package_prefix
-      value: github.com/horonlee/servora/api/gen/go
+    override:
+        - file_option: go_package_prefix
+          value: github.com/horonlee/servora/api/gen/go
 
-    # per-directory go_package options
-    # value第一部分是生成代码的包路径，第二部分是go包名。
-    - file_option: go_package
-      path: auth/service/v1
-      value: github.com/horonlee/servora/api/gen/go/auth/service/v1;authpb
-    - file_option: go_package
-      path: user/service/v1
-      value: github.com/horonlee/servora/api/gen/go/user/service/v1;userpb
-    - file_option: go_package
-      path: test/service/v1
-      value: github.com/horonlee/servora/api/gen/go/test/service/v1;testpb
-    - file_option: go_package
-      path: servora/service/v1
-      value: github.com/horonlee/servora/api/gen/go/servora/service/v1;servorapb
-    - file_option: go_package
-      path: sayhello/service/v1
-      value: github.com/horonlee/servora/api/gen/go/sayhello/service/v1;sayhellopb
+        # per-directory go_package options
+        # value第一部分是生成代码的包路径，第二部分是go包名。
+        - file_option: go_package
+          path: auth/service/v1
+          value: github.com/horonlee/servora/api/gen/go/auth/service/v1;authpb
+        - file_option: go_package
+          path: user/service/v1
+          value: github.com/horonlee/servora/api/gen/go/user/service/v1;userpb
+        - file_option: go_package
+          path: test/service/v1
+          value: github.com/horonlee/servora/api/gen/go/test/service/v1;testpb
+        - file_option: go_package
+          path: servora/service/v1
+          value: github.com/horonlee/servora/api/gen/go/servora/service/v1;servorapb
+        - file_option: go_package
+          path: sayhello/service/v1
+          value: github.com/horonlee/servora/api/gen/go/sayhello/service/v1;sayhellopb
 
 plugins:
-  # generate go struct code
-  - local: protoc-gen-go
-    out: gen/go
-    opt: paths=source_relative
+    # generate go struct code
+    - local: protoc-gen-go
+      out: gen/go
+      opt: paths=source_relative
 
-  # generate grpc service code
-  - local: protoc-gen-go-grpc
-    out: gen/go
-    opt: paths=source_relative
+    # generate grpc service code
+    - local: protoc-gen-go-grpc
+      out: gen/go
+      opt: paths=source_relative
 
-  # generate kratos http service code
-  - local: protoc-gen-go-http
-    out: gen/go
-    opt: paths=source_relative
+    # generate kratos http service code
+    - local: protoc-gen-go-http
+      out: gen/go
+      opt: paths=source_relative
 
-  # generate kratos errors code
-  - local: protoc-gen-go-errors
-    out: gen/go
-    opt: paths=source_relative
+    # generate kratos errors code
+    - local: protoc-gen-go-errors
+      out: gen/go
+      opt: paths=source_relative
 
-  # generate message validator code
-  - local: protoc-gen-validate
-    out: gen/go
-    opt:
-      - paths=source_relative
-      - lang=go
+    # generate message validator code
+    - local: protoc-gen-validate
+      out: gen/go
+      opt:
+          - paths=source_relative
+          - lang=go
 
-  # ==================== Python ====================
-  # # generate python struct code
-  # - remote: buf.build/protocolbuffers/python
-  #   out: gen/python
+    # ==================== Python ====================
+    # # generate python struct code
+    # - remote: buf.build/protocolbuffers/python
+    #   out: gen/python
 
-  # # generate python grpc service code
-  # - remote: buf.build/grpc/python
-  #   out: gen/python
+    # # generate python grpc service code
+    # - remote: buf.build/grpc/python
+    #   out: gen/python

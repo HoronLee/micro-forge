@@ -3,15 +3,15 @@ version: v2
 clean: true
 
 managed:
-  enabled: false
+    enabled: false
 
 inputs:
-  - directory: protos
-    paths:
-      - protos/servora/service/v1
-      - protos/auth/service/v1
-      - protos/user/service/v1
+    - directory: protos
+      paths:
+          - protos/servora/service/v1
+          - protos/auth/service/v1
+          - protos/user/service/v1
 
 plugins:
-  - local: protoc-gen-typescript-http
-    out: ../web/src/service/gen
+    - local: protoc-gen-typescript-http
+      out: ../app/servora/service/web/src/service/gen
