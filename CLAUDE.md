@@ -55,6 +55,7 @@ type(scope): description
 - `servora`: servora 服务（仅 example 分支）
 - `sayhello`: sayhello 服务（仅 example 分支）
 - `example`: 示例配置（仅 example 分支）
+- `openspec`: OpenSpec 变更管理（需要同步到 main）
 
 ### 提交消息示例
 
