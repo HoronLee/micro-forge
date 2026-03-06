@@ -1,47 +1,38 @@
 <!-- Parent: ../AGENTS.md -->
 # JWT 认证工具 (pkg/jwt)
 
-**最后更新时间**: 2026-02-09
+**最后更新时间**: 2026-03-06
 
 ## 模块目的
-提供基于泛型的 JWT (JSON Web Token) 签发与解析工具。支持自定义 Claims 结构，并提供 Kratos 上下文集成。
+
+提供泛型 JWT 工具：签发、解析，以及 claims 的 context 注入/提取。
+
+## 当前实现事实
+
+- 核心类型：`JWT[T any]`
+- 配置类型：`Config{ SecretKey string }`
+- `GenerateToken` / `ParseToken` 都会在运行时校验 `*T` 是否实现 `jwt.Claims`
+- `NewContext` / `FromContext` 使用包内私有 key，避免 context key 冲突
 
 ## 关键文件
-- `jwt.go`: 核心实现，包含 `JWT[T]` 结构体及令牌操作方法。
+
+- `jwt.go`
 
 ## 使用示例
 
-### 1. 定义 Claims
 ```go
 type MyClaims struct {
-    jwt.RegisteredClaims
     UserID int64 `json:"user_id"`
+    jwt.RegisteredClaims
 }
+
+j := jwtutil.NewJWT[MyClaims](&jwtutil.Config{SecretKey: "secret"})
+token, err := j.GenerateToken(&MyClaims{UserID: 1})
+claims, err := j.ParseToken(token)
+ctx := jwtutil.NewContext(context.Background(), claims)
 ```
 
-### 2. 初始化与生成令牌
-```go
-j := jwt.NewJWT[MyClaims](&jwt.Config{SecretKey: "your-secret"})
-token, err := j.GenerateToken(&MyClaims{
-    UserID: 123,
-    RegisteredClaims: jwt.RegisteredClaims{
-        ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-    },
-})
-```
+## 注意事项
 
-### 3. 解析与上下文操作
-```go
-claims, err := j.ParseToken(tokenString)
-ctx := jwt.NewContext(context.Background(), claims)
-if c, ok := jwt.FromContext[MyClaims](ctx); ok {
-    fmt.Println(c.UserID)
-}
-```
-
-## 测试指南
-运行单元测试：
-```bash
-go test -v ./pkg/jwt/...
-```
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+- claims 类型通常通过嵌入 `jwt.RegisteredClaims` 满足接口
+- 当前目录没有独立测试文件，修改逻辑后应至少运行 `go test ./pkg/...`
