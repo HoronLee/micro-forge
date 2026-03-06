@@ -2,7 +2,7 @@
 # commit-msg hook: 验证提交消息格式
 # 格式: type(scope): description
 # type: feat, fix, refactor, docs, test, chore
-# scope: pkg, cmd, servora, sayhello, example
+# scope: pkg, cmd, app, example, openspec, infra
 
 commit_msg_file="$1"
 commit_msg=$(cat "$commit_msg_file")
@@ -13,7 +13,7 @@ if echo "$commit_msg" | grep -qE "^(Merge|Revert)"; then
 fi
 
 # 验证格式: type(scope): description
-if ! echo "$commit_msg" | grep -qE "^(feat|fix|refactor|docs|test|chore)\((pkg|cmd|servora|sayhello|example)\): .+"; then
+if ! echo "$commit_msg" | grep -qE "^(feat|fix|refactor|docs|test|chore)\((pkg|cmd|app|example|openspec|infra)\): .+"; then
     echo "❌ 提交消息格式错误！"
     echo ""
     echo "要求格式: type(scope): description"
@@ -29,13 +29,15 @@ if ! echo "$commit_msg" | grep -qE "^(feat|fix|refactor|docs|test|chore)\((pkg|c
     echo "允许的 scope:"
     echo "  - pkg:      框架核心代码"
     echo "  - cmd:      CLI 工具"
-    echo "  - servora:  servora 服务"
-    echo "  - sayhello: sayhello 服务"
+    echo "  - app:      应用服务"
     echo "  - example:  示例配置"
+    echo "  - openspec: OpenSpec 变更管理"
+    echo "  - infra:    基础设施/部署"
     echo ""
     echo "示例:"
     echo "  feat(pkg): add new middleware for authentication"
     echo "  fix(cmd): correct flag parsing in svr command"
+    echo "  feat(app): add user registration endpoint"
     echo "  docs(example): update deployment guide"
     echo ""
     echo "您的提交消息:"

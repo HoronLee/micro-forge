@@ -52,10 +52,10 @@ type(scope): description
 
 - `pkg`: 框架核心代码（需要同步到 main）
 - `cmd`: CLI 工具（需要同步到 main）
-- `servora`: servora 服务（仅 example 分支）
-- `sayhello`: sayhello 服务（仅 example 分支）
+- `app`: 应用服务（仅 example 分支）
 - `example`: 示例配置（仅 example 分支）
 - `openspec`: OpenSpec 变更管理（需要同步到 main）
+- `infra`: 基础设施/部署（需要同步到 main）
 
 ### 提交消息示例
 
@@ -63,8 +63,9 @@ type(scope): description
 # 正确 ✓
 feat(pkg): add authentication middleware
 fix(cmd): correct flag parsing in svr command
-refactor(servora): improve user service structure
+feat(app): add user registration endpoint
 docs(example): update deployment guide
+chore(infra): update kubernetes deployment config
 
 # 错误 ✗
 add authentication middleware          # 缺少 type 和 scope
