@@ -1,0 +1,46 @@
+#!/bin/bash
+# pre-commit hook: 防止在 main 分支提交服务代码
+
+current_branch=$(git symbolic-ref --short HEAD)
+
+# 只在 main 分支检查
+if [ "$current_branch" != "main" ]; then
+    exit 0
+fi
+
+# 检查是否有服务代码被修改
+service_files=$(git diff --cached --name-only | grep -E "^app/(servora|sayhello)/")
+
+if [ -n "$service_files" ]; then
+    echo "❌ 错误：不能在 main 分支提交服务代码！"
+    echo ""
+    echo "main 分支只包含框架代码。服务代码应该在 example 分支开发。"
+    echo ""
+    echo "检测到以下服务文件："
+    echo "$service_files" | sed 's/^/  - /'
+    echo ""
+    echo "请执行以下操作："
+    echo "  1. 取消本次提交: git reset HEAD"
+    echo "  2. 切换到 example 分支: git checkout example"
+    echo "  3. 在 example 分支提交这些更改"
+    echo ""
+    exit 1
+fi
+
+# 检查是否有部署配置被修改（manifests/, docker-compose.yaml 等）
+deploy_files=$(git diff --cached --name-only | grep -E "^(manifests/|docker-compose\.yaml|docker-compose\.dev\.yaml|go\.work)")
+
+if [ -n "$deploy_files" ]; then
+    echo "❌ 错误：不能在 main 分支提交部署配置！"
+    echo ""
+    echo "main 分支只包含框架代码和模板。部署配置应该在 example 分支。"
+    echo ""
+    echo "检测到以下部署文件："
+    echo "$deploy_files" | sed 's/^/  - /'
+    echo ""
+    echo "如果是模板文件，请放在 templates/ 目录下。"
+    echo ""
+    exit 1
+fi
+
+exit 0

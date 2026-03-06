@@ -1,0 +1,46 @@
+#!/bin/bash
+# commit-msg hook: 验证提交消息格式
+# 格式: type(scope): description
+# type: feat, fix, refactor, docs, test, chore
+# scope: pkg, cmd, servora, sayhello, example
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# 允许 merge 提交和 revert 提交
+if echo "$commit_msg" | grep -qE "^(Merge|Revert)"; then
+    exit 0
+fi
+
+# 验证格式: type(scope): description
+if ! echo "$commit_msg" | grep -qE "^(feat|fix|refactor|docs|test|chore)\((pkg|cmd|servora|sayhello|example)\): .+"; then
+    echo "❌ 提交消息格式错误！"
+    echo ""
+    echo "要求格式: type(scope): description"
+    echo ""
+    echo "允许的 type:"
+    echo "  - feat:     新功能"
+    echo "  - fix:      Bug 修复"
+    echo "  - refactor: 重构"
+    echo "  - docs:     文档"
+    echo "  - test:     测试"
+    echo "  - chore:    构建/工具"
+    echo ""
+    echo "允许的 scope:"
+    echo "  - pkg:      框架核心代码"
+    echo "  - cmd:      CLI 工具"
+    echo "  - servora:  servora 服务"
+    echo "  - sayhello: sayhello 服务"
+    echo "  - example:  示例配置"
+    echo ""
+    echo "示例:"
+    echo "  feat(pkg): add new middleware for authentication"
+    echo "  fix(cmd): correct flag parsing in svr command"
+    echo "  docs(example): update deployment guide"
+    echo ""
+    echo "您的提交消息:"
+    echo "  $commit_msg"
+    exit 1
+fi
+
+exit 0
