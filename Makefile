@@ -147,18 +147,18 @@ gen: api openapi wire ent
 	@echo "$(GREEN)✓ All code generated$(RESET)"
 
 # generate protobuf api code (go + ts)
-api: api-go api-ts
+api: api-go
 	@echo "$(GREEN)✓ Protobuf code generated $(RESET)"
 
 # generate protobuf api go code
 api-go:
 	@echo "$(CYAN)Generating protobuf Go code via $(BUF_GO_GEN_TEMPLATE)...$(RESET)"
-	@cd $(API_DIR) && buf generate --template $(BUF_GO_GEN_TEMPLATE)
+	@buf generate --template $(BUF_GO_GEN_TEMPLATE)
 
 # generate protobuf api typescript code for web
 api-ts:
 	@echo "$(CYAN)Generating protobuf TypeScript code via $(BUF_TS_GEN_TEMPLATE)...$(RESET)"
-	@cd $(API_DIR) && buf generate --template $(BUF_TS_GEN_TEMPLATE)
+	@buf generate --template $(BUF_TS_GEN_TEMPLATE)
 
 # generate protobuf api OpenAPI v3 docs for all services
 openapi:
@@ -171,13 +171,13 @@ openapi:
 # lint protobuf files
 lint.proto:
 	@echo "$(CYAN)Linting protobuf files...$(RESET)"
-	@cd $(API_DIR) && buf lint
+	@buf lint
 	@echo "$(GREEN)✓ Proto lint complete$(RESET)"
 
 # update buf dependencies
 buf-update:
 	@echo "$(CYAN)Updating buf dependencies...$(RESET)"
-	@cd $(API_DIR)/protos && buf dep update
+	@buf dep update
 	@echo "$(GREEN)✓ Buf dependencies updated$(RESET)"
 
 # build all service applications
@@ -275,7 +275,7 @@ compose.dev.down:
 # clean build artifacts
 clean:
 	@echo "$(CYAN)Cleaning build artifacts...$(RESET)"
-	@rm -rf $(API_DIR)/gen
+	@rm -rf api/gen/go
 	@$(foreach dir, $(dir $(realpath $(SRCS_MK))),\
       cd $(dir) && make clean;\
     )

@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: pagination/v1/pagination.proto
 
-package v1
+package paginationpb
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
@@ -429,8 +429,8 @@ const file_pagination_v1_pagination_proto_rawDesc = "" +
 	"\x12PaginationResponse\x128\n" +
 	"\x04page\x18\x01 \x01(\v2\".pagination.PagePaginationResponseH\x00R\x04page\x12>\n" +
 	"\x06cursor\x18\x02 \x01(\v2$.pagination.CursorPaginationResponseH\x00R\x06cursorB\x06\n" +
-	"\x04modeB\x9f\x01\n" +
-	"\x0ecom.paginationB\x0fPaginationProtoP\x01Z4github.com/horonlee/servora/api/gen/go/pagination/v1\xa2\x02\x03PXX\xaa\x02\n" +
+	"\x04modeB\xac\x01\n" +
+	"\x0ecom.paginationB\x0fPaginationProtoP\x01ZAgithub.com/horonlee/servora/api/gen/go/pagination/v1;paginationpb\xa2\x02\x03PXX\xaa\x02\n" +
 	"Pagination\xca\x02\n" +
 	"Pagination\xe2\x02\x16Pagination\\GPBMetadata\xea\x02\n" +
 	"Paginationb\x06proto3"

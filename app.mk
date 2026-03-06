@@ -149,13 +149,18 @@ endif
 
 # generate protobuf api code
 api:
-	@cd ../../../api && \
-	buf generate --template buf.go.gen.yaml
+	@cd ../../.. && $(MAKE) api-go
+ifneq (,$(wildcard ./api/buf.typescript.gen.yaml))
+	@cd ../../.. && buf generate --template app/$(APP_RELATIVE_PATH)/api/buf.typescript.gen.yaml
+endif
 
 # generate protobuf api OpenAPI v3 docs
 openapi:
-	@cd ../../../api && \
-	buf generate --template $(OPENAPI_CONFIG)
+ifneq (,$(wildcard ./api/buf.openapi.gen.yaml))
+	@cd ../../.. && buf generate --template app/$(APP_RELATIVE_PATH)/api/buf.openapi.gen.yaml
+else
+	@echo "No OpenAPI config found for $(SERVICE_NAME), skipping..."
+endif
 
 # show help
 help:

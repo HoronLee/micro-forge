@@ -1,0 +1,20 @@
+version: v2
+
+modules:
+  - path: api/protos
+  - path: app/servora/service/api/protos
+  - path: app/sayhello/service/api/protos
+
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/kratos/apis
+  - buf.build/bufbuild/protovalidate
+  - buf.build/gnostic/gnostic
+
+breaking:
+  use:
+    - FILE
+
+lint:
+  use:
+    - STANDARD

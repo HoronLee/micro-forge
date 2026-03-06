@@ -4,6 +4,7 @@ package template.service.v1;
 
 import "gnostic/openapi/v3/annotations.proto";
 
+option go_package = "github.com/horonlee/servora/api/gen/go/template/service/v1;templatepb";
 // OpenAPI 文档配置
 option (gnostic.openapi.v3.document) = {
   info: {

@@ -5,6 +5,7 @@ package template.service.v1;
 
 import "buf/validate/validate.proto";
 
+option go_package = "github.com/horonlee/servora/api/gen/go/template/service/v1;templatepb";
 option java_multiple_files = true;
 option java_outer_classname = "TemplateProtoV1";
 option java_package = "dev.servora.api.template.v1";

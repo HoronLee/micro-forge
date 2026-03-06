@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: template/service/v1/template_doc.proto
 
-package servicev1
+package templatepb
 
 import (
 	_ "github.com/google/gnostic/openapiv3"
@@ -25,7 +25,7 @@ var File_template_service_v1_template_doc_proto protoreflect.FileDescriptor
 
 const file_template_service_v1_template_doc_proto_rawDesc = "" +
 	"\n" +
-	"&template/service/v1/template_doc.proto\x12\x13template.service.v1\x1a$gnostic/openapi/v3/annotations.protoB\xb2\x05\xbaG\xcf\x03\x12\xad\x01\n" +
+	"&template/service/v1/template_doc.proto\x12\x13template.service.v1\x1a$gnostic/openapi/v3/annotations.protoB\xb3\x05\xbaG\xcf\x03\x12\xad\x01\n" +
 	"\fTemplate API\x12\x1dTemplate 微服务 API 文档\"3\n" +
 	"\fservora Team\x12#https://github.com/horonlee/servora*D\n" +
 	"\vMIT License\x125https://github.com/horonlee/servora/blob/main/LICENSE2\x031.0*\x9c\x02\n" +
@@ -50,7 +50,7 @@ const file_template_service_v1_template_doc_proto_rawDesc = "" +
 	"\x10application/json\x12&\n" +
 	"$\x12\"\n" +
 	" #/components/schemas/KratosError\n" +
-	"\x17com.template.service.v1B\x10TemplateDocProtoP\x01ZDgithub.com/horonlee/servora/api/gen/go/template/service/v1;servicev1\xa2\x02\x03TSX\xaa\x02\x13Template.Service.V1\xca\x02\x13Template\\Service\\V1\xe2\x02\x1fTemplate\\Service\\V1\\GPBMetadata\xea\x02\x15Template::Service::V1b\x06proto3"
+	"\x17com.template.service.v1B\x10TemplateDocProtoP\x01ZEgithub.com/horonlee/servora/api/gen/go/template/service/v1;templatepb\xa2\x02\x03TSX\xaa\x02\x13Template.Service.V1\xca\x02\x13Template\\Service\\V1\xe2\x02\x1fTemplate\\Service\\V1\\GPBMetadata\xea\x02\x15Template::Service::V1b\x06proto3"
 
 var file_template_service_v1_template_doc_proto_goTypes = []any{}
 var file_template_service_v1_template_doc_proto_depIdxs = []int32{

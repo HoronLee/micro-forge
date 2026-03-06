@@ -6,7 +6,7 @@
 // - protoc             (unknown)
 // source: template/service/v1/template.proto
 
-package servicev1
+package templatepb
 
 import (
 	context "context"

@@ -4,6 +4,8 @@ package pagination;
 
 import "buf/validate/validate.proto";
 
+option go_package = "github.com/horonlee/servora/api/gen/go/pagination/v1;paginationpb";
+
 message PagePaginationRequest {
   int32 page = 1 [(buf.validate.field).int32.gte = 0];
   int32 page_size = 2 [(buf.validate.field).int32 = {

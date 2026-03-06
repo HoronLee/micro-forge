@@ -6,7 +6,7 @@
 // 	protoc        (unknown)
 // source: template/service/v1/template.proto
 
-package servicev1
+package templatepb
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
@@ -124,8 +124,8 @@ const file_template_service_v1_template_proto_rawDesc = "" +
 	"\rHelloResponse\x12\x14\n" +
 	"\x05reply\x18\x01 \x01(\tR\x05reply2c\n" +
 	"\x0fTemplateService\x12P\n" +
-	"\x05Hello\x12!.template.service.v1.HelloRequest\x1a\".template.service.v1.HelloResponse\"\x00B\xdc\x01\n" +
-	"\x17com.template.service.v1B\rTemplateProtoP\x01ZDgithub.com/horonlee/servora/api/gen/go/template/service/v1;servicev1\xa2\x02\x03TSX\xaa\x02\x13Template.Service.V1\xca\x02\x13Template\\Service\\V1\xe2\x02\x1fTemplate\\Service\\V1\\GPBMetadata\xea\x02\x15Template::Service::V1b\x06proto3"
+	"\x05Hello\x12!.template.service.v1.HelloRequest\x1a\".template.service.v1.HelloResponse\"\x00B\xdd\x01\n" +
+	"\x17com.template.service.v1B\rTemplateProtoP\x01ZEgithub.com/horonlee/servora/api/gen/go/template/service/v1;templatepb\xa2\x02\x03TSX\xaa\x02\x13Template.Service.V1\xca\x02\x13Template\\Service\\V1\xe2\x02\x1fTemplate\\Service\\V1\\GPBMetadata\xea\x02\x15Template::Service::V1b\x06proto3"
 
 var (
 	file_template_service_v1_template_proto_rawDescOnce sync.Once
