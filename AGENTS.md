@@ -8,9 +8,85 @@
 
 当前主线事实：
 - 根目录仍保留 `go.mod`，并通过 `go.work` 纳管 `api/gen`、`app/servora/service`、`app/sayhello/service`
-- 前端已迁入 `app/servora/service/web/`，不再位于仓库根目录
 - Proto 采用三处模块联合编排：`api/protos/`、`app/servora/service/api/protos/`、`app/sayhello/service/api/protos/`
 - 共享生成入口在根目录：`make gen`、`make api`、`make openapi`、`make wire`、`make ent`
+
+## 开发约束
+
+### 双分支策略
+
+**重要**：本仓库采用双分支架构，AI 开发时必须遵循以下规则：
+
+- **main 分支**：纯框架代码，用于 Go module 发布
+  - 包含：`pkg/`、`cmd/svr/`、`api/protos/`、`templates/`、文档
+  - 不包含：服务实现（`app/`）、部署配置（`manifests/`、`docker-compose.yaml`）
+
+- **example 分支**：完整示例项目
+  - 包含：框架代码 + 示例服务（servora、sayhello）+ 部署配置
+  - 用于：开发、测试、演示
+
+**AI 开发规则**：
+1. 始终在 example 分支开发
+2. 不要在 main 分支直接开发（缺少服务代码和部署配置，无法运行和测试）
+3. 框架提交（`pkg/` 或 `cmd/`）需要同步到 main 分支（使用 `git cherry-pick`）
+
+### templates vs manifests
+
+**重要区别**：这两个目录服务于不同的目的，不应该相互同步。
+
+- **templates/**（main 分支）：通用的、框架级别的部署模板，给使用框架的人作为参考
+- **manifests/**（example 分支）：具体的、可运行的部署配置，基于 templates 创建的实例
+
+### 提交消息格式
+
+**强制规范**：所有提交必须遵循以下格式（git hooks 会自动验证）：
+
+```
+type(scope): description
+```
+
+**允许的 type**：`feat`、`fix`、`refactor`、`docs`、`test`、`chore`
+
+**允许的 scope**：
+- `pkg`：框架核心代码（需要同步到 main）
+- `cmd`：CLI 工具（需要同步到 main）
+- `app`：应用服务（仅 example 分支）
+- `example`：示例配置（仅 example 分支）
+- `openspec`：OpenSpec 变更管理（需要同步到 main）
+- `infra`：基础设施/部署（需要同步到 main）
+
+**提交最佳实践**：
+1. 保持提交小而专注：一个提交只做一件事
+2. 避免混合提交：不要在同一个提交中同时修改框架和服务代码
+3. 使用清晰的描述：描述"做了什么"，而不是"怎么做的"
+4. 遵循格式：git hooks 会自动验证，不符合格式的提交会被拒绝
+
+**规范的灵活性**：
+- 当现有的 type/scope 无法准确描述提交时，主动询问用户是否需要添加新的分类
+- 不要默默使用不在列表中的 type/scope（会被 hooks 拒绝）
+- 不要强行将提交归类到不合适的 type/scope
+
+### Git Hooks
+
+本仓库使用 git hooks 强制执行规范：
+
+- **commit-msg hook**：验证提交消息格式
+- **pre-commit hook**：防止在 main 分支提交服务代码，执行 gofmt 格式检查
+- **post-merge hook**：自动同步 git hooks
+
+安装 hooks：`bash scripts/install-hooks.sh`
+
+**重要**：不要使用 `--no-verify` 跳过 hooks 验证。
+
+### README 合并策略
+
+main 和 example 分支的 README.md 内容不同，合并时会产生冲突。
+
+**合并规则**：
+- 从 example 合并到 main：保留 main 分支的 README.md（框架说明）
+- 从 main 合并到 example：保留 example 分支的 README.md（完整项目说明）
+
+**原则**：始终保留目标分支（你当前所在分支）的 README 内容。
 
 ## 顶层目录
 
@@ -53,33 +129,23 @@
 
 ## 常用命令
 
-在项目根目录执行：
-
+### 初始化与生成
 ```bash
-make init
-make gen
-make api
-make openapi
-make wire
-make ent
-make build
-make test
-make lint.go
-make compose.build
-make compose.up
-make compose.dev
-make compose.dev.up
-make compose.dev.restart
+make init          # 安装工具
+make gen           # 统一生成（api + openapi + wire + ent）
 ```
 
-CLI：
-
+### 开发与测试
 ```bash
-svr new api <name> <server_name>
-svr new api billing servora
-svr new api billing.invoice servora
-svr gen gorm <service-name...>
-svr gen gorm servora --dry-run
+make compose.dev   # 启动开发环境
+make test          # 运行测试
+make lint.go       # Go 代码检查
+```
+
+### CLI 工具
+```bash
+svr new api <name> <server_name>    # 创建 API proto 脚手架
+svr gen gorm <service-name...>      # GORM GEN 代码生成
 ```
 
 ## 维护提示
