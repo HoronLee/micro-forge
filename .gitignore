@@ -48,6 +48,7 @@ tmp/
 .sisyphus/
 .claude/
 .omc/
+.opencode/
 
 # Environment files
 .env.local
