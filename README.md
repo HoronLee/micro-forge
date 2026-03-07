@@ -4,7 +4,9 @@
 
 `servora` 是一个基于 **Go Kratos** 的微服务快开框架，采用 **DDD 分层** 与 **Proto First** 开发方式，覆盖 API 定义、代码生成、服务实现、前端联调、可观测性与容器化开发链路。
 
-> **💡 这是 example 分支**：包含完整的示例服务（servora、sayhello）和运行环境。如果你只需要框架代码，请切换到 `main` 分支。
+> 本 README 统一描述框架能力与 example 示例用法，适用于 `main` 与 `example` 分支。
+
+## 📘 框架概览
 
 ## ✨ 核心能力
 
@@ -59,6 +61,10 @@
 ├── go.work                          # Go workspace
 └── Makefile                         # 根目录统一入口
 ```
+
+## 🧪 Example 示例
+
+以下内容聚焦完整示例项目（`servora` + `sayhello`）的本地运行与开发。
 
 ## 🚀 快速开始
 
