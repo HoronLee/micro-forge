@@ -1,4 +1,7 @@
-## 新增需求
+## 目的
+定义 git-hooks-validation 的功能需求和验证场景。
+
+## 需求
 
 ### 需求:通用化 commit scope 规则
 

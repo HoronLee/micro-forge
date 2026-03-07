@@ -1,4 +1,7 @@
-## 新增需求
+## 目的
+定义 svr-new-api-command 的功能需求和验证场景。
+
+## 需求
 
 ### 需求:服务维度的新建 proto 命令
 系统必须提供 `svr new api <name> <server_name>` 命令，用于在指定服务目录下生成新的 gRPC proto 骨架。
