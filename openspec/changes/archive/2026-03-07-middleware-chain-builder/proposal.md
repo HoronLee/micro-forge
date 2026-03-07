@@ -1,4 +1,4 @@
-## 为什么
+## Why
 
 当前 servora 框架中，每个微服务（servora、sayhello）都在各自的 `internal/server/` 中重复定义基础中间件链（recovery、tracing、logging、ratelimit、validate、metrics）。这导致：
 1. 代码重复约 15-20 行/服务
@@ -7,22 +7,22 @@
 
 现在做是因为框架正在完善基础设施层，需要在服务数量增加前建立统一的中间件组合模式。
 
-## 变更内容
+## What Changes
 
 - **新增**：在 `pkg/transport/server/middleware/` 提供 `ChainBuilder`，使用 Builder 模式构建标准中间件链
 - **新增**：支持可选的 tracing、metrics 配置，以及可禁用的 ratelimit
 - **修改**：重构 `app/servora/service/internal/server/http.go` 和 `grpc.go` 使用新的 ChainBuilder
 - **修改**：重构 `app/sayhello/service/internal/server/grpc.go` 使用新的 ChainBuilder
 
-## 功能 (Capabilities)
+## Capabilities
 
-### 新增功能
+### New Capabilities
 
 - `middleware-chain`: 提供统一的中间件链构建器，支持 Builder 模式配置 recovery、tracing、logging、ratelimit、validate、metrics 的组合
 
-### 修改功能
+### Modified Capabilities
 
-## 影响
+## Impact
 
 - **代码**：
   - 新增 `pkg/transport/server/middleware/chain.go`
