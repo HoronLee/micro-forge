@@ -20,13 +20,9 @@ Servora 是 ProtoBuf-contract-first 的模块化框架库。仓库同时包含 G
 | `obs/` | logger/tracing/metrics/audit 可观测性能力 |
 | `contrib/` | kafka/db/k8s/redis/cache 等可选生态集成与 adapter |
 
-隐藏工具目录（`.claude`、`.cursor`、`.opencode`、`.sisyphus`、`.understand-anything`、`.worktrees`、`.venv`）不是框架源码，不要写入架构说明或测试范围。
-
 ## 开发约束
 
 提交格式：`type(scope): description`。type：`feat`/`fix`/`refactor`/`docs`/`test`/`chore`。scope 建议使用一级域或二级域：`api`、`cmd`、`web/proto-utils`、`core/bootstrap`、`transport/server`、`security/authn`、`obs/audit`、`contrib/db/redis` 等。
-
-Go 代码保持 `gofmt`/`goimports`，错误返回带上下文，测试优先表驱动。接口保持小；接受 interface、返回具体类型。
 
 ## 版本与 tag
 
@@ -36,7 +32,6 @@ Go 代码保持 `gofmt`/`goimports`，错误返回带上下文，测试优先表
 - 仅文档、Makefile、CI、基础设施配置变更通常不打 tag。
 - 修改 `web/packages/proto-utils/` 并需要发布 npm 时，更新包版本后打 `proto-utils/vx.y.z` tag；这个 tag 只触发 npm 发布 workflow，不触发 Go release。
 - `make bsr.push` 会读取 HEAD 上的 `v0.x.y` tag 作为 BSR label；没有 tag 时只推 `main` label。
-- 已推送 tag 不要移动。
 
 ## Proto contract
 
@@ -78,8 +73,6 @@ Annotation extension 号段：
 6. 打主 tag；如有 proto/gen 产物变化，执行 `make tag.api TAG=v0.x.y`。
 7. BSR 日常推送由 GitHub Actions 处理；`make bsr.push` 仅作本地预演或应急。
 
-不要把业务仓库 proto 放进本仓；业务 proto 放在各自 `app/<svc>/service/api/protos/`。
-
 修改 `@servora/proto-utils`：
 
 1. 修改 `web/packages/proto-utils/`。
@@ -116,5 +109,3 @@ make bsr.push    # 推送 buf.build/servora/servora
 - `@servora/proto-utils` 的 npm Trusted Publisher 指向 `Servora-Kit/servora` 与 `.github/workflows/publish-proto-utils.yml`。
 - 修改 `cmd/protoc-gen-servora-*` 后运行 `make plugin`，再跑相关 plugin 测试和 `make gen`。
 - 生成器输出 shape 改动时，同时检查 `api/gen`、下游示例和本层 tag 规则。
-- transport TLS 构造归 `security/tls`，配置 proto 位于 `servora/security/tls/v1/config.proto`，不要把证书解析逻辑散落到 client/server 子包。
-- authn/authz 失败/拒绝审计通过 `obs/audit.Auditor` 发送 CloudEvents；安全中间件不要 import audit emitter/recorder 具体实现。
