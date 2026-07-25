@@ -21,6 +21,6 @@
 
 ```bash
 go test ./cmd/protoc-gen-servora-crud
-make gen
-make gen.ts
+just gen
+just gen-ts
 ```

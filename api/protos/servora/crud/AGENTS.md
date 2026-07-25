@@ -31,9 +31,9 @@ crud/
 在 `servora/` 执行：
 
 ```bash
-make lint.proto
-make gen
-make gen.ts
+just lint-proto
+just gen
+just gen-ts
 ```
 
-生成代码只由 Buf/Makefile 写入，不手改 `api/gen` 或 TypeScript 生成目录。
+生成代码只由 Buf/justfile 写入，不手改 `api/gen` 或 TypeScript 生成目录。

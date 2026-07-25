@@ -130,7 +130,7 @@ func runNewApi(name, outputRoot, templateDir string) error {
 
 	fmt.Printf("✓ Created:\n  %s\n  %s\n", mainFile, docFile)
 	fmt.Printf("\nNext steps:\n")
-	fmt.Printf("  1. Run 'make gen' to generate Go code\n")
+	fmt.Printf("  1. Run 'just gen' to generate Go code\n")
 	fmt.Printf("  2. If you need OpenAPI/TypeScript generation, check service-level config:\n")
 	fmt.Printf("     - api/buf.openapi.gen.yaml\n")
 	fmt.Printf("     - api/buf.typescript.gen.yaml\n")

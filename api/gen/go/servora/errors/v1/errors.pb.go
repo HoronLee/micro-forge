@@ -58,8 +58,7 @@ const file_servora_errors_v1_errors_proto_rawDesc = "" +
 	"\n" +
 	"\x1eservora/errors/v1/errors.proto\x12\x11servora.errors.v1\x1a google/protobuf/descriptor.proto:A\n" +
 	"\fdefault_code\x12\x1c.google.protobuf.EnumOptions\x18Ċ\x03 \x01(\x05R\vdefaultCode:7\n" +
-	"\x04code\x12!.google.protobuf.EnumValueOptions\x18Ŋ\x03 \x01(\x05R\x04codeB\xd0\x01\n" +
-	"\x15com.servora.errors.v1B\vErrorsProtoP\x01ZDgithub.com/Servora-Kit/servora/api/gen/go/servora/errors/v1;errorsv1\xa2\x02\x03SEX\xaa\x02\x11Servora.Errors.V1\xca\x02\x11Servora\\Errors\\V1\xe2\x02\x1dServora\\Errors\\V1\\GPBMetadata\xea\x02\x13Servora::Errors::V1b\x06proto3"
+	"\x04code\x12!.google.protobuf.EnumValueOptions\x18Ŋ\x03 \x01(\x05R\x04codeBFZDgithub.com/Servora-Kit/servora/api/gen/go/servora/errors/v1;errorsv1b\x06proto3"
 
 var file_servora_errors_v1_errors_proto_goTypes = []any{
 	(*descriptorpb.EnumOptions)(nil),      // 0: google.protobuf.EnumOptions

@@ -186,7 +186,7 @@ cover: ## Run tests with coverage profile
 	@$(foreach mod,$(GO_WORKSPACE_MODULES),(cd $(ROOT_DIR)$(mod) && go test -v ./... -coverprofile=coverage.out) && ) true
 
 .PHONY: lint
-lint: lint.go ## Run Go lint
+lint: lint.go lint.proto ## Run Go and Proto lint
 
 .PHONY: lint.go
 lint.go:

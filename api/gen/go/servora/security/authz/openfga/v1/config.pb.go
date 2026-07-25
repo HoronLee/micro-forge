@@ -100,8 +100,7 @@ const file_servora_security_authz_openfga_v1_config_proto_rawDesc = "" +
 	"\bstore_id\x18\x02 \x01(\tB\x06\x8a\xce\x18\x02\x10\x01R\astoreId\x12\x19\n" +
 	"\bmodel_id\x18\x03 \x01(\tR\amodelId\x12\x1b\n" +
 	"\tapi_token\x18\x04 \x01(\tR\bapiToken:\x15\x82\xce\x18\x11\n" +
-	"\rauthz.openfga\x10\x01B\xb8\x02\n" +
-	"%com.servora.security.authz.openfga.v1B\vConfigProtoP\x01ZYgithub.com/Servora-Kit/servora/api/gen/go/servora/security/authz/openfga/v1;openfgaconfpb\xa2\x02\x04SSAO\xaa\x02!Servora.Security.Authz.Openfga.V1\xca\x02!Servora\\Security\\Authz\\Openfga\\V1\xe2\x02-Servora\\Security\\Authz\\Openfga\\V1\\GPBMetadata\xea\x02%Servora::Security::Authz::Openfga::V1b\x06proto3"
+	"\rauthz.openfga\x10\x01B[ZYgithub.com/Servora-Kit/servora/api/gen/go/servora/security/authz/openfga/v1;openfgaconfpbb\x06proto3"
 
 var (
 	file_servora_security_authz_openfga_v1_config_proto_rawDescOnce sync.Once

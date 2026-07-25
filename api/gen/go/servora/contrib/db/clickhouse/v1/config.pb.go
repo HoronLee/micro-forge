@@ -175,8 +175,7 @@ const file_servora_contrib_db_clickhouse_v1_config_proto_rawDesc = "" +
 	"\x8a\xce\x18\x06\n" +
 	"\x04noneR\vcompression:\x12\x82\xce\x18\x0e\n" +
 	"\n" +
-	"clickhouse\x10\x01B\xb1\x02\n" +
-	"$com.servora.contrib.db.clickhouse.v1B\vConfigProtoP\x01ZWgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/clickhouse/v1;clickhousepb\xa2\x02\x04SCDC\xaa\x02 Servora.Contrib.Db.Clickhouse.V1\xca\x02 Servora\\Contrib\\Db\\Clickhouse\\V1\xe2\x02,Servora\\Contrib\\Db\\Clickhouse\\V1\\GPBMetadata\xea\x02$Servora::Contrib::Db::Clickhouse::V1b\x06proto3"
+	"clickhouse\x10\x01BYZWgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/clickhouse/v1;clickhousepbb\x06proto3"
 
 var (
 	file_servora_contrib_db_clickhouse_v1_config_proto_rawDescOnce sync.Once

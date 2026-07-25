@@ -20,5 +20,5 @@
 
 ```bash
 go test ./cmd/protoc-gen-servora-crud
-make web.test
+just web-test
 ```

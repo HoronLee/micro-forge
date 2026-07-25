@@ -177,8 +177,7 @@ const file_servora_authn_v1_annotations_proto_rawDesc = "" +
 	"\vMODE_PUBLIC\x10\x01\x12\x11\n" +
 	"\rMODE_REQUIRED\x10\x02:g\n" +
 	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\xfd\x88\x03 \x01(\v2\x1b.servora.authn.v1.AuthnRuleR\x0eserviceDefault:Q\n" +
-	"\x04rule\x12\x1e.google.protobuf.MethodOptions\x18\xfc\x88\x03 \x01(\v2\x1b.servora.authn.v1.AuthnRuleR\x04ruleB\xce\x01\n" +
-	"\x14com.servora.authn.v1B\x10AnnotationsProtoP\x01ZBgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/v1;authnpb\xa2\x02\x03SAX\xaa\x02\x10Servora.Authn.V1\xca\x02\x10Servora\\Authn\\V1\xe2\x02\x1cServora\\Authn\\V1\\GPBMetadata\xea\x02\x12Servora::Authn::V1b\x06proto3"
+	"\x04rule\x12\x1e.google.protobuf.MethodOptions\x18\xfc\x88\x03 \x01(\v2\x1b.servora.authn.v1.AuthnRuleR\x04ruleBDZBgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/v1;authnpbb\x06proto3"
 
 var (
 	file_servora_authn_v1_annotations_proto_rawDescOnce sync.Once

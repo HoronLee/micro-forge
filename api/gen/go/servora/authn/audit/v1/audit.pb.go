@@ -235,9 +235,7 @@ const file_servora_authn_audit_v1_audit_proto_rawDesc = "" +
 	"\amessage\x18\x03 \x01(\tR\amessage\"@\n" +
 	"\fAuthnSuccess\x12\x16\n" +
 	"\x06scheme\x18\x01 \x01(\tR\x06scheme\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessageB\xf2\x01\n" +
-	"\x1acom.servora.authn.audit.v1B\n" +
-	"AuditProtoP\x01ZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/audit/v1;authnauditpb\xa2\x02\x03SAA\xaa\x02\x16Servora.Authn.Audit.V1\xca\x02\x16Servora\\Authn\\Audit\\V1\xe2\x02\"Servora\\Authn\\Audit\\V1\\GPBMetadata\xea\x02\x19Servora::Authn::Audit::V1b\x06proto3"
+	"\amessage\x18\x02 \x01(\tR\amessageBOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/audit/v1;authnauditpbb\x06proto3"
 
 var (
 	file_servora_authn_audit_v1_audit_proto_rawDescOnce sync.Once

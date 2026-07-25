@@ -417,8 +417,7 @@ const file_servora_cloudevents_v1_cloudevents_proto_rawDesc = "" +
 	"\x04attrB\x06\n" +
 	"\x04data\"M\n" +
 	"\x0fCloudEventBatch\x12:\n" +
-	"\x06events\x18\x01 \x03(\v2\".servora.cloudevents.v1.CloudEventR\x06eventsB\xef\x01\n" +
-	"\x1acom.servora.cloudevents.v1B\x10CloudeventsProtoP\x01ZEgithub.com/Servora-Kit/servora/api/gen/go/servora/cloudevents/v1;cev1\xa2\x02\x03SCX\xaa\x02\x16Servora.Cloudevents.V1\xca\x02\x16Servora\\Cloudevents\\V1\xe2\x02\"Servora\\Cloudevents\\V1\\GPBMetadata\xea\x02\x18Servora::Cloudevents::V1b\x06proto3"
+	"\x06events\x18\x01 \x03(\v2\".servora.cloudevents.v1.CloudEventR\x06eventsBGZEgithub.com/Servora-Kit/servora/api/gen/go/servora/cloudevents/v1;cev1b\x06proto3"
 
 var (
 	file_servora_cloudevents_v1_cloudevents_proto_rawDescOnce sync.Once

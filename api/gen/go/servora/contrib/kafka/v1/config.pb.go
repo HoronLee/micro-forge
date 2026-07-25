@@ -243,8 +243,7 @@ const file_servora_contrib_kafka_v1_config_proto_rawDesc = "" +
 	"\tmechanism\x18\x01 \x01(\tR\tmechanism\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x03 \x01(\tR\bpassword:\r\x82\xce\x18\t\n" +
-	"\x05kafka\x10\x01B\xfa\x01\n" +
-	"\x1ccom.servora.contrib.kafka.v1B\vConfigProtoP\x01ZJgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/kafka/v1;kafkapb\xa2\x02\x03SCK\xaa\x02\x18Servora.Contrib.Kafka.V1\xca\x02\x18Servora\\Contrib\\Kafka\\V1\xe2\x02$Servora\\Contrib\\Kafka\\V1\\GPBMetadata\xea\x02\x1bServora::Contrib::Kafka::V1b\x06proto3"
+	"\x05kafka\x10\x01BLZJgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/kafka/v1;kafkapbb\x06proto3"
 
 var (
 	file_servora_contrib_kafka_v1_config_proto_rawDescOnce sync.Once

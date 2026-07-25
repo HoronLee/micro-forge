@@ -21,6 +21,6 @@
 
 ```bash
 go test ./cmd/protoc-gen-go-errors
-make plugin
-make gen
+just plugin
+just gen
 ```

@@ -39,7 +39,7 @@ cmd/svr/
 - 输出到 `app/<server_name>/service/api/protos/<name>/service/v1/`
 - 只生成 `<name>.proto` 与 `<name>_doc.proto`，不生成 HTTP 专用 `i_*.proto`
 - 模板位于 `api/protos/servora/template/service/v1/`
-- 生成后需手动运行 `make gen` 生成 Go 代码
+- 生成后需手动运行 `just gen` 生成 Go 代码
 - 若需 OpenAPI/TypeScript 生成，需检查服务级 `api/buf.openapi.gen.yaml` 或 `api/buf.typescript.gen.yaml`
 
 ### `svr gen gorm`
@@ -84,7 +84,7 @@ svr openfga model apply --store-id <store-id> --model manifests/openfga/model/se
 ## 维护提示
 
 - 文档示例必须以项目根目录为基准，不要写成在服务目录执行 `go run ./cmd/svr ...`
-- `svr new api` 只生成 proto 骨架，不自动修改服务级生成配置，不自动运行 `make gen`
+- `svr new api` 只生成 proto 骨架，不自动修改服务级生成配置，不自动运行 `just gen`
 - `svr gen gorm` 依据 `app/*/service` 扫描可用服务
 - `svr openfga` 使用 `openfga/go-sdk` 直连 API + `openfga/language` 解析 DSL，不依赖外部工具
 - `svr openfga model apply` 每次上传都会创建新的 model version（OpenFGA 原生版本化），需重启服务使新 `FGA_MODEL_ID` 生效

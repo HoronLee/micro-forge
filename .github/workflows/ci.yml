@@ -24,6 +24,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: "1.57.0"
+
+      - run: just --fmt --check
+
       - name: Setup multi-module workspace
         run: go work init . ./api/gen
 

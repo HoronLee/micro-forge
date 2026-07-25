@@ -238,8 +238,7 @@ const file_servora_contrib_mail_v1_config_proto_rawDesc = "" +
 	"\fsend_timeout\x18\a \x01(\v2\x19.google.protobuf.DurationR\vsendTimeout\"8\n" +
 	"\bMailFrom\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04nameB\xf3\x01\n" +
-	"\x1bcom.servora.contrib.mail.v1B\vConfigProtoP\x01ZHgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/mail/v1;mailpb\xa2\x02\x03SCM\xaa\x02\x17Servora.Contrib.Mail.V1\xca\x02\x17Servora\\Contrib\\Mail\\V1\xe2\x02#Servora\\Contrib\\Mail\\V1\\GPBMetadata\xea\x02\x1aServora::Contrib::Mail::V1b\x06proto3"
+	"\x04name\x18\x02 \x01(\tR\x04nameBJZHgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/mail/v1;mailpbb\x06proto3"
 
 var (
 	file_servora_contrib_mail_v1_config_proto_rawDescOnce sync.Once

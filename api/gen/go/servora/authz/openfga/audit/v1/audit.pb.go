@@ -221,9 +221,7 @@ const file_servora_authz_openfga_audit_v1_audit_proto_rawDesc = "" +
 	"\x05Tuple\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x1a\n" +
 	"\brelation\x18\x02 \x01(\tR\brelation\x12\x16\n" +
-	"\x06object\x18\x03 \x01(\tR\x06objectB\xa6\x02\n" +
-	"\"com.servora.authz.openfga.audit.v1B\n" +
-	"AuditProtoP\x01ZWgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/openfga/audit/v1;openfgaauditpb\xa2\x02\x04SAOA\xaa\x02\x1eServora.Authz.Openfga.Audit.V1\xca\x02\x1eServora\\Authz\\Openfga\\Audit\\V1\xe2\x02*Servora\\Authz\\Openfga\\Audit\\V1\\GPBMetadata\xea\x02\"Servora::Authz::Openfga::Audit::V1b\x06proto3"
+	"\x06object\x18\x03 \x01(\tR\x06objectBYZWgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/openfga/audit/v1;openfgaauditpbb\x06proto3"
 
 var (
 	file_servora_authz_openfga_audit_v1_audit_proto_rawDescOnce sync.Once

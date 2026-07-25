@@ -103,8 +103,7 @@ const file_servora_obs_audit_v1_config_proto_rawDesc = "" +
 	"\x05topic\x18\x03 \x01(\tB\x1a\x8a\xce\x18\x16\n" +
 	"\x14servora.audit.eventsR\x05topic\x12!\n" +
 	"\fservice_name\x18\x04 \x01(\tR\vserviceName:\v\x82\xce\x18\a\n" +
-	"\x05auditB\xe6\x01\n" +
-	"\x18com.servora.obs.audit.v1B\vConfigProtoP\x01ZJgithub.com/Servora-Kit/servora/api/gen/go/servora/obs/audit/v1;auditconfpb\xa2\x02\x03SOA\xaa\x02\x14Servora.Obs.Audit.V1\xca\x02\x14Servora\\Obs\\Audit\\V1\xe2\x02 Servora\\Obs\\Audit\\V1\\GPBMetadata\xea\x02\x17Servora::Obs::Audit::V1b\x06proto3"
+	"\x05auditBLZJgithub.com/Servora-Kit/servora/api/gen/go/servora/obs/audit/v1;auditconfpbb\x06proto3"
 
 var (
 	file_servora_obs_audit_v1_config_proto_rawDescOnce sync.Once

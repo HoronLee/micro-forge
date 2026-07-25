@@ -123,8 +123,7 @@ const file_servora_security_jwt_v1_config_proto_rawDesc = "" +
 	"\x06604800R\rrefreshExpire\x12\x16\n" +
 	"\x06issuer\x18\x05 \x01(\tR\x06issuer\x12\x1a\n" +
 	"\baudience\x18\x06 \x01(\tR\baudience:\v\x82\xce\x18\a\n" +
-	"\x03jwt\x10\x01B\xf2\x01\n" +
-	"\x1bcom.servora.security.jwt.v1B\vConfigProtoP\x01ZGgithub.com/Servora-Kit/servora/api/gen/go/servora/security/jwt/v1;jwtv1\xa2\x02\x03SSJ\xaa\x02\x17Servora.Security.Jwt.V1\xca\x02\x17Servora\\Security\\Jwt\\V1\xe2\x02#Servora\\Security\\Jwt\\V1\\GPBMetadata\xea\x02\x1aServora::Security::Jwt::V1b\x06proto3"
+	"\x03jwt\x10\x01BIZGgithub.com/Servora-Kit/servora/api/gen/go/servora/security/jwt/v1;jwtv1b\x06proto3"
 
 var (
 	file_servora_security_jwt_v1_config_proto_rawDescOnce sync.Once

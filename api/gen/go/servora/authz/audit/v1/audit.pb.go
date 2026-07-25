@@ -211,9 +211,7 @@ const file_servora_authz_audit_v1_audit_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DECISION_ALLOWED\x10\x01\x12\x13\n" +
 	"\x0fDECISION_DENIED\x10\x02\x12\x12\n" +
-	"\x0eDECISION_ERROR\x10\x03B\xf2\x01\n" +
-	"\x1acom.servora.authz.audit.v1B\n" +
-	"AuditProtoP\x01ZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/audit/v1;authzauditpb\xa2\x02\x03SAA\xaa\x02\x16Servora.Authz.Audit.V1\xca\x02\x16Servora\\Authz\\Audit\\V1\xe2\x02\"Servora\\Authz\\Audit\\V1\\GPBMetadata\xea\x02\x19Servora::Authz::Audit::V1b\x06proto3"
+	"\x0eDECISION_ERROR\x10\x03BOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/audit/v1;authzauditpbb\x06proto3"
 
 var (
 	file_servora_authz_audit_v1_audit_proto_rawDescOnce sync.Once

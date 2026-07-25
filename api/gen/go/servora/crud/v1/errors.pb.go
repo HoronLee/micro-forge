@@ -108,8 +108,7 @@ const file_servora_crud_v1_errors_proto_rawDesc = "" +
 	"\"CRUD_ERROR_REASON_INVALID_ORDER_BY\x10\x04\x1a\x05\xa8\xd4\x18\x90\x03\x12/\n" +
 	"$CRUD_ERROR_REASON_INVALID_FIELD_MASK\x10\x05\x1a\x05\xa8\xd4\x18\x90\x03\x120\n" +
 	"%CRUD_ERROR_REASON_INVALID_FIELD_VALUE\x10\x06\x1a\x05\xa8\xd4\x18\x90\x03\x12%\n" +
-	"\x1aCRUD_ERROR_REASON_INTERNAL\x10\a\x1a\x05\xa8\xd4\x18\xf4\x03\x1a\x05\xa0\xd4\x18\xf4\x03B\xc2\x01\n" +
-	"\x13com.servora.crud.v1B\vErrorsProtoP\x01Z@github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1;crudpb\xa2\x02\x03SCX\xaa\x02\x0fServora.Crud.V1\xca\x02\x0fServora\\Crud\\V1\xe2\x02\x1bServora\\Crud\\V1\\GPBMetadata\xea\x02\x11Servora::Crud::V1b\x06proto3"
+	"\x1aCRUD_ERROR_REASON_INTERNAL\x10\a\x1a\x05\xa8\xd4\x18\xf4\x03\x1a\x05\xa0\xd4\x18\xf4\x03BBZ@github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1;crudpbb\x06proto3"
 
 var (
 	file_servora_crud_v1_errors_proto_rawDescOnce sync.Once

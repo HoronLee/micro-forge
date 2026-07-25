@@ -132,8 +132,7 @@ const file_servora_transport_http_cors_v1_config_proto_rawDesc = "" +
 	"\x11allow_credentials\x18\x06 \x01(\bR\x10allowCredentials\x12=\n" +
 	"\amax_age\x18\a \x01(\v2\x19.google.protobuf.DurationB\t\x8a\xce\x18\x05\n" +
 	"\x0324hR\x06maxAge:\f\x82\xce\x18\b\n" +
-	"\x04cors\x10\x01B\x9f\x02\n" +
-	"\"com.servora.transport.http.cors.v1B\vConfigProtoP\x01ZOgithub.com/Servora-Kit/servora/api/gen/go/servora/transport/http/cors/v1;corsv1\xa2\x02\x04STHC\xaa\x02\x1eServora.Transport.Http.Cors.V1\xca\x02\x1eServora\\Transport\\Http\\Cors\\V1\xe2\x02*Servora\\Transport\\Http\\Cors\\V1\\GPBMetadata\xea\x02\"Servora::Transport::Http::Cors::V1b\x06proto3"
+	"\x04cors\x10\x01BQZOgithub.com/Servora-Kit/servora/api/gen/go/servora/transport/http/cors/v1;corsv1b\x06proto3"
 
 var (
 	file_servora_transport_http_cors_v1_config_proto_rawDescOnce sync.Once

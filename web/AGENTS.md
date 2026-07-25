@@ -59,7 +59,7 @@ servora/
     │       ├── src/
     │       │   ├── crud/      # FieldMask、filter/order、pager、ResourceNameError
     │       │   ├── client/    # HTTP request handler 与 Kratos error helpers
-    │       │   └── gen/       # make gen.ts 生成，禁止手改
+    │       │   └── gen/       # just gen-ts 生成，禁止手改
     │       ├── dist/         # 构建产物（gitignored，npm publish 时生成）
     │       ├── package.json
     │       ├── tsconfig.json

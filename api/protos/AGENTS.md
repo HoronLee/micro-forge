@@ -51,15 +51,15 @@ import "servora/audit/v1/annotations.proto";
 ## 生成与校验
 
 ```bash
-make lint.proto
-make fmt.proto
-make gen
-make gen.fresh   # 删除/重命名 proto 或移除 plugin 时使用
-make bsr.update
-make bsr.push
+just lint-proto
+just fmt-proto
+just gen
+just gen-fresh   # 删除/重命名 proto 或移除 plugin 时使用
+just bsr-update
+just bsr-push
 ```
 
-修改 proto 后检查 `api/gen/go` diff。生成代码只由 `make gen`/Buf 写入，不手改。
+修改 proto 后检查 `api/gen/go` diff。生成代码只由 `just gen`/Buf 写入，不手改。
 
 ## 常见反模式
 

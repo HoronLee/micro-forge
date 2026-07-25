@@ -23,8 +23,8 @@ export const UserName = {
   parse(value: string): UserNameParts {
     const segments = value.split("/");
     if (segments.length === 4 && segments[0] === "tenants" && segments[2] === "users") {
-      assertResourceSegment("User", "tenant", segments[1]!); 
-      assertResourceSegment("User", "user", segments[3]!); 
+      assertResourceSegment("User", "tenant", segments[1]!);
+      assertResourceSegment("User", "user", segments[3]!);
       return {
         tenant: segments[1]!,
         user: segments[3]!,
@@ -61,4 +61,3 @@ export const UserUpdateFields = {
   nickname: "nickname",
   temporaryPassword: "temporary_password",
 } as const;
-
