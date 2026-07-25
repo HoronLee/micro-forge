@@ -22,6 +22,6 @@
 ## For AI Agents
 
 - 从项目根目录运行 `go run ./cmd/svr ...`
-- 修改 proto 注解后需重新 `make gen` 以触发对应 plugin
-- 各 plugin 的合并测试套件位于对应 `cmd/protoc-gen-servora-*/`；CRUD generator 变更需运行 `go test ./cmd/protoc-gen-servora-crud`、`make gen` 与 `make gen.ts`。
-- 修改 `protoc-gen-typescript-http` 后运行 `go test ./cmd/protoc-gen-typescript-http/...`、`make gen.ts`、`make web.typecheck` 和 `make web.build`；生成契约测试位于 `internal/plugin/generate_test.go`
+- 修改 proto 注解后需重新 `just gen` 以触发对应 plugin
+- 各 plugin 的合并测试套件位于对应 `cmd/protoc-gen-servora-*/`；CRUD generator 变更需运行 `go test ./cmd/protoc-gen-servora-crud`、`just gen` 与 `just gen-ts`。
+- 修改 `protoc-gen-typescript-http` 后运行 `go test ./cmd/protoc-gen-typescript-http/...`、`just gen-ts`、`just web-typecheck` 和 `just web-build`；生成契约测试位于 `internal/plugin/generate_test.go`

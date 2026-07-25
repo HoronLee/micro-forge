@@ -116,7 +116,7 @@ func openLiveFixture(t *testing.T, entDialect, driverName, envName string) *entf
 	t.Helper()
 	dsn := os.Getenv(envName)
 	if dsn == "" {
-		t.Fatalf("%s is required; use the explicit Makefile integration target", envName)
+		t.Fatalf("%s is required; use the explicit Just integration recipe", envName)
 	}
 	database, err := stdsql.Open(driverName, dsn)
 	if err != nil {

@@ -137,8 +137,7 @@ const file_servora_contrib_db_redis_v1_config_proto_rawDesc = "" +
 	"\fdial_timeout\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\vdialTimeout\x12<\n" +
 	"\fread_timeout\x18\a \x01(\v2\x19.google.protobuf.DurationR\vreadTimeout\x12>\n" +
 	"\rwrite_timeout\x18\b \x01(\v2\x19.google.protobuf.DurationR\fwriteTimeout:\r\x82\xce\x18\t\n" +
-	"\x05redis\x10\x01B\x8e\x02\n" +
-	"\x1fcom.servora.contrib.db.redis.v1B\vConfigProtoP\x01ZMgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1;redispb\xa2\x02\x04SCDR\xaa\x02\x1bServora.Contrib.Db.Redis.V1\xca\x02\x1bServora\\Contrib\\Db\\Redis\\V1\xe2\x02'Servora\\Contrib\\Db\\Redis\\V1\\GPBMetadata\xea\x02\x1fServora::Contrib::Db::Redis::V1b\x06proto3"
+	"\x05redis\x10\x01BOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1;redispbb\x06proto3"
 
 var (
 	file_servora_contrib_db_redis_v1_config_proto_rawDescOnce sync.Once

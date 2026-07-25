@@ -19,6 +19,6 @@
 在 `servora/` 执行：
 
 ```bash
-make web.typecheck
-make web.build
+just web-typecheck
+just web-build
 ```

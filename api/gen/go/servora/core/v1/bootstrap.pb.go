@@ -2157,8 +2157,7 @@ const file_servora_core_v1_bootstrap_proto_rawDesc = "" +
 	"\fOtelProtocol\x12\x1d\n" +
 	"\x19OTEL_PROTOCOL_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12OTEL_PROTOCOL_GRPC\x10\x01\x12\x1f\n" +
-	"\x1bOTEL_PROTOCOL_HTTP_PROTOBUF\x10\x02B\xc5\x01\n" +
-	"\x13com.servora.core.v1B\x0eBootstrapProtoP\x01Z@github.com/Servora-Kit/servora/api/gen/go/servora/core/v1;corev1\xa2\x02\x03SCX\xaa\x02\x0fServora.Core.V1\xca\x02\x0fServora\\Core\\V1\xe2\x02\x1bServora\\Core\\V1\\GPBMetadata\xea\x02\x11Servora::Core::V1b\x06proto3"
+	"\x1bOTEL_PROTOCOL_HTTP_PROTOBUF\x10\x02BBZ@github.com/Servora-Kit/servora/api/gen/go/servora/core/v1;corev1b\x06proto3"
 
 var (
 	file_servora_core_v1_bootstrap_proto_rawDescOnce sync.Once

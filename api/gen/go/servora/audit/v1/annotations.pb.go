@@ -169,8 +169,7 @@ const file_servora_audit_v1_annotations_proto_rawDesc = "" +
 	"\x12AUDIT_MODE_ENABLED\x10\x02:\\\n" +
 	"\n" +
 	"audit_rule\x12\x1e.google.protobuf.MethodOptions\x18\xb4\x87\x03 \x01(\v2\x1b.servora.audit.v1.AuditRuleR\tauditRule:g\n" +
-	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\xb5\x87\x03 \x01(\v2\x1b.servora.audit.v1.AuditRuleR\x0eserviceDefaultB\xce\x01\n" +
-	"\x14com.servora.audit.v1B\x10AnnotationsProtoP\x01ZBgithub.com/Servora-Kit/servora/api/gen/go/servora/audit/v1;auditv1\xa2\x02\x03SAX\xaa\x02\x10Servora.Audit.V1\xca\x02\x10Servora\\Audit\\V1\xe2\x02\x1cServora\\Audit\\V1\\GPBMetadata\xea\x02\x12Servora::Audit::V1b\x06proto3"
+	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\xb5\x87\x03 \x01(\v2\x1b.servora.audit.v1.AuditRuleR\x0eserviceDefaultBDZBgithub.com/Servora-Kit/servora/api/gen/go/servora/audit/v1;auditv1b\x06proto3"
 
 var (
 	file_servora_audit_v1_annotations_proto_rawDescOnce sync.Once

@@ -323,8 +323,7 @@ const file_servora_crud_v1_page_token_proto_rawDesc = "" +
 	"null_value\x18\t \x01(\x0e2\x1a.google.protobuf.NullValueH\x00R\tnullValue\x128\n" +
 	"\x18timestamp_offset_seconds\x18\n" +
 	" \x01(\x11R\x16timestampOffsetSecondsB\a\n" +
-	"\x05valueB\xc5\x01\n" +
-	"\x13com.servora.crud.v1B\x0ePageTokenProtoP\x01Z@github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1;crudpb\xa2\x02\x03SCX\xaa\x02\x0fServora.Crud.V1\xca\x02\x0fServora\\Crud\\V1\xe2\x02\x1bServora\\Crud\\V1\\GPBMetadata\xea\x02\x11Servora::Crud::V1b\x06proto3"
+	"\x05valueBBZ@github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1;crudpbb\x06proto3"
 
 var (
 	file_servora_crud_v1_page_token_proto_rawDescOnce sync.Once

@@ -76,8 +76,8 @@ message User {
 生成链：
 
 ```bash
-make gen     # Go message、service stub、CRUD companion
-make gen.ts  # TypeScript message/client 与 CRUD companion
+just gen     # Go message、service stub、CRUD companion
+just gen-ts  # TypeScript message/client 与 CRUD companion
 ```
 
 Go companion 提供：
@@ -454,20 +454,20 @@ const updateMask = makeUpdateMask(UserUpdateFields, {
 CI 不启动数据库、中间件、Docker service 或 Testcontainers。无外部服务路径：
 
 ```bash
-make lint
-make test                 # go test -short ./...
-make web.typecheck
-make web.build
+just lint
+just test                 # go test -short ./...
+just web-typecheck
+just web-build
 ```
 
 发布前由开发者自行启动依赖，并显式运行：
 
 ```bash
 SERVORA_ENT_SQLITE_DSN='file:servora_crud_live?mode=memory&cache=shared&_fk=1' \
-  make test.ent.sqlite
+  just test-ent-sqlite
 
 SERVORA_ENT_POSTGRES_DSN='postgres://user:password@127.0.0.1:5432/db?sslmode=disable' \
-  make test.ent.postgres
+  just test-ent-postgres
 ```
 
 测试只消费 DSN，不创建或销毁容器。SQLite 与 PostgreSQL 两条结果都应记录为 release gate；MySQL live test 不是当前发布门槛。

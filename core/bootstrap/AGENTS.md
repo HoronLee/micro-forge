@@ -63,7 +63,7 @@ type ConfApplier interface { ApplyConf() error }
 - `WithEnvPrefix()` 是环境变量前缀入口，依赖 pre-load `Name(...)`；不要在业务服务里复制命名约定。
 - `config/loader.go` 是 bootstrap 启动链的一部分，但不要把 loader 细节散落到上层文档。
 - 不在本包引入具体 transport server、database client、业务 repository 或 handler。
-- 修改 Bootstrap proto schema 后同步检查 `api/protos/servora/core/v1/bootstrap.proto`、`make gen` 输出和本包测试。
+- 修改 Bootstrap proto schema 后同步检查 `api/protos/servora/core/v1/bootstrap.proto`、`just gen` 输出和本包测试。
 
 ## 常见反模式
 

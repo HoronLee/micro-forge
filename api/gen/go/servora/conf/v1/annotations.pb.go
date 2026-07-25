@@ -185,8 +185,7 @@ const file_servora_conf_v1_annotations_proto_rawDesc = "" +
 	"\adefault\x18\x01 \x01(\tR\adefault\x12\x1a\n" +
 	"\brequired\x18\x02 \x01(\bR\brequired:Y\n" +
 	"\asection\x12\x1f.google.protobuf.MessageOptions\x18\xe0\x89\x03 \x01(\v2\x1c.servora.conf.v1.SectionRuleR\asection:Q\n" +
-	"\x05field\x12\x1d.google.protobuf.FieldOptions\x18\xe1\x89\x03 \x01(\v2\x1a.servora.conf.v1.FieldRuleR\x05fieldB\xc5\x01\n" +
-	"\x13com.servora.conf.v1B\x10AnnotationsProtoP\x01Z>github.com/Servora-Kit/servora/api/gen/go/servora/conf/v1;conf\xa2\x02\x03SCX\xaa\x02\x0fServora.Conf.V1\xca\x02\x0fServora\\Conf\\V1\xe2\x02\x1bServora\\Conf\\V1\\GPBMetadata\xea\x02\x11Servora::Conf::V1b\x06proto3"
+	"\x05field\x12\x1d.google.protobuf.FieldOptions\x18\xe1\x89\x03 \x01(\v2\x1a.servora.conf.v1.FieldRuleR\x05fieldB@Z>github.com/Servora-Kit/servora/api/gen/go/servora/conf/v1;confb\x06proto3"
 
 var (
 	file_servora_conf_v1_annotations_proto_rawDescOnce sync.Once

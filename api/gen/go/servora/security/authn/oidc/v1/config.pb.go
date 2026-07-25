@@ -104,8 +104,7 @@ const file_servora_security_authn_oidc_v1_config_proto_rawDesc = "" +
 	"\x01/R\x18defaultLogoutRedirectUri\x12,\n" +
 	"\x0elogin_base_url\x18\x04 \x01(\tB\x06\x8a\xce\x18\x02\x10\x01R\floginBaseUrl:\x12\x82\xce\x18\x0e\n" +
 	"\n" +
-	"authn.oidc\x10\x01B\xa3\x02\n" +
-	"\"com.servora.security.authn.oidc.v1B\vConfigProtoP\x01ZSgithub.com/Servora-Kit/servora/api/gen/go/servora/security/authn/oidc/v1;oidcconfpb\xa2\x02\x04SSAO\xaa\x02\x1eServora.Security.Authn.Oidc.V1\xca\x02\x1eServora\\Security\\Authn\\Oidc\\V1\xe2\x02*Servora\\Security\\Authn\\Oidc\\V1\\GPBMetadata\xea\x02\"Servora::Security::Authn::Oidc::V1b\x06proto3"
+	"authn.oidc\x10\x01BUZSgithub.com/Servora-Kit/servora/api/gen/go/servora/security/authn/oidc/v1;oidcconfpbb\x06proto3"
 
 var (
 	file_servora_security_authn_oidc_v1_config_proto_rawDescOnce sync.Once

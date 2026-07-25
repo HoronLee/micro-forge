@@ -20,6 +20,6 @@
 在 `servora/` 执行：
 
 ```bash
-make lint.proto
-make gen
+just lint-proto
+just gen
 ```

@@ -39,8 +39,8 @@ contrib/db/entgo/
 
 ```bash
 go test ./contrib/db/entgo/...
-SERVORA_ENT_SQLITE_DSN='file:servora_crud_live?mode=memory&cache=shared&_fk=1' make test.ent.sqlite
-SERVORA_ENT_POSTGRES_DSN='postgres://…' make test.ent.postgres
+SERVORA_ENT_SQLITE_DSN='file:servora_crud_live?mode=memory&cache=shared&_fk=1' just test-ent-sqlite
+SERVORA_ENT_POSTGRES_DSN='postgres://…' just test-ent-postgres
 ```
 
 ## 维护提示

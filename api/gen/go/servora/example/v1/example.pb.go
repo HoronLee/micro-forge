@@ -699,8 +699,8 @@ const file_servora_example_v1_example_proto_rawDesc = "" +
 	"UpdateUser\x12%.servora.example.v1.UpdateUserRequest\x1a\x18.servora.example.v1.User\"B\xdaA\x10user,update_mask\x82\xd3\xe4\x93\x02):\x04user2!/v1/{user.name=tenants/*/users/*}\x12z\n" +
 	"\n" +
 	"DeleteUser\x12%.servora.example.v1.DeleteUserRequest\x1a\x18.servora.example.v1.User\"+\xdaA\x04name\x82\xd3\xe4\x93\x02\x1e*\x1c/v1/{name=tenants/*/users/*}\x12\x8a\x01\n" +
-	"\fUndeleteUser\x12'.servora.example.v1.UndeleteUserRequest\x1a\x18.servora.example.v1.User\"7\xdaA\x04name\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=tenants/*/users/*}:undeleteB\xd8\x01\n" +
-	"\x16com.servora.example.v1B\fExampleProtoP\x01ZFgithub.com/Servora-Kit/servora/api/gen/go/servora/example/v1;examplev1\xa2\x02\x03SEX\xaa\x02\x12Servora.Example.V1\xca\x02\x12Servora\\Example\\V1\xe2\x02\x1eServora\\Example\\V1\\GPBMetadata\xea\x02\x14Servora::Example::V1b\x06proto3"
+	"\fUndeleteUser\x12'.servora.example.v1.UndeleteUserRequest\x1a\x18.servora.example.v1.User\"7\xdaA\x04name\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=tenants/*/users/*}:undeleteBp\n" +
+	"\x16dev.servora.example.v1B\fExampleProtoP\x01ZFgithub.com/Servora-Kit/servora/api/gen/go/servora/example/v1;examplev1b\x06proto3"
 
 var (
 	file_servora_example_v1_example_proto_rawDescOnce sync.Once

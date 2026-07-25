@@ -98,8 +98,7 @@ const file_servora_security_tls_v1_config_proto_rawDesc = "" +
 	"\x06enable\x18\x01 \x01(\bR\x06enable\x12\x1b\n" +
 	"\tcert_path\x18\x02 \x01(\tR\bcertPath\x12\x19\n" +
 	"\bkey_path\x18\x03 \x01(\tR\akeyPath\x12\x17\n" +
-	"\aca_path\x18\x04 \x01(\tR\x06caPathB\xf2\x01\n" +
-	"\x1bcom.servora.security.tls.v1B\vConfigProtoP\x01ZGgithub.com/Servora-Kit/servora/api/gen/go/servora/security/tls/v1;tlspb\xa2\x02\x03SST\xaa\x02\x17Servora.Security.Tls.V1\xca\x02\x17Servora\\Security\\Tls\\V1\xe2\x02#Servora\\Security\\Tls\\V1\\GPBMetadata\xea\x02\x1aServora::Security::Tls::V1b\x06proto3"
+	"\aca_path\x18\x04 \x01(\tR\x06caPathBIZGgithub.com/Servora-Kit/servora/api/gen/go/servora/security/tls/v1;tlspbb\x06proto3"
 
 var (
 	file_servora_security_tls_v1_config_proto_rawDescOnce sync.Once

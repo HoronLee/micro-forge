@@ -30,7 +30,7 @@ errors/
 在 `servora/` 执行：
 
 ```bash
-make lint.proto
+just lint-proto
 go test ./cmd/protoc-gen-go-errors
-make gen
+just gen
 ```

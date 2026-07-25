@@ -301,6 +301,19 @@ Servora 默认接入 [OpenTelemetry](https://opentelemetry.io/) SDK，开箱即�
 
 本地起一套 Prometheus + Jaeger UI + Grafana 即可看到全链路指标与 trace（参考 [servora-platform](https://github.com/Servora-Kit/servora-platform) 的 compose 配置；`servora-example` 只内置 Consul / Jaeger / OTel Collector，可直接 curl `/metrics` 做 smoke）。
 
+## 贡献🎉
+
+### 辅助工具链
+
+在 Servora 主仓开发时，`justfile` 是主动维护的任务入口，需要 [Just 1.57.0+](https://just.systems/man/en/packages.html)。迁移期根 `Makefile` 保留兼容；已有同名命令的行为变更同步维护，新命令默认只加入 `justfile`。
+
+```bash
+just --list  # 查看全部命令
+just test    # 运行无外部依赖的 Go 测试
+just lint    # 运行 Go 与 Proto lint
+just gen     # 增量生成 Go 代码
+```
+
 ## 星的轨迹⭐
 
 [![Star History Chart](https://api.star-history.com/svg?repos=Servora-Kit/servora&type=Date)](https://star-history.com/#Servora-Kit/servora&Date)

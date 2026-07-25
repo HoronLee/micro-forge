@@ -198,9 +198,7 @@ const file_servora_authz_v1_authz_proto_rawDesc = "" +
 	"\x0fAUTHZ_MODE_NONE\x10\x01\x12\x14\n" +
 	"\x10AUTHZ_MODE_CHECK\x10\x02:Q\n" +
 	"\x04rule\x12\x1e.google.protobuf.MethodOptions\x18\x98\x88\x03 \x01(\v2\x1b.servora.authz.v1.AuthzRuleR\x04rule:g\n" +
-	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\x99\x88\x03 \x01(\v2\x1b.servora.authz.v1.AuthzRuleR\x0eserviceDefaultB\xc8\x01\n" +
-	"\x14com.servora.authz.v1B\n" +
-	"AuthzProtoP\x01ZBgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/v1;authzpb\xa2\x02\x03SAX\xaa\x02\x10Servora.Authz.V1\xca\x02\x10Servora\\Authz\\V1\xe2\x02\x1cServora\\Authz\\V1\\GPBMetadata\xea\x02\x12Servora::Authz::V1b\x06proto3"
+	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\x99\x88\x03 \x01(\v2\x1b.servora.authz.v1.AuthzRuleR\x0eserviceDefaultBDZBgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/v1;authzpbb\x06proto3"
 
 var (
 	file_servora_authz_v1_authz_proto_rawDescOnce sync.Once

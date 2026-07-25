@@ -55,4 +55,4 @@ Mail 只作为 proto 便利配置存在于 `servora/api/protos/servora/contrib/m
 
 - 新增第三方系统接线前先判断所属领域，优先复用 `db/`、`cache/`、顶层平台/消息目录。
 - 新增 Go 包时同步检查 `servora/AGENTS.md` 的 scope 示例。
-- 修改公共 proto 配置时必须同步执行 `make gen.fresh` 和 `make gen`。
+- 修改公共 proto 配置时必须同步执行 `just gen-fresh` 和 `just gen`。
