@@ -98,6 +98,58 @@ plan := crud.MustBuildResourcePlan[*userv1.User](userv1.UserCRUDDescriptor())
 
 service 使用 generated name helper 或 Plan 解析 canonical name；不要手拼资源名或字段路径。
 
+### 顶层与嵌套集合
+
+公开可运行的 User example 使用嵌套 pattern `tenants/{tenant}/users/{user}`，因此标准 Create/List request 都携带 `REQUIRED parent`。它验证的是嵌套资源的完整 runtime 组合，不是顶层资源准入。
+
+单一顶层 pattern 没有资源 parent。以下 Realm 只用于说明公共合同与 service 组合，不会向 `servora-platform/app/example` 增加第二个业务资源：
+
+```proto
+message Realm {
+  option (google.api.resource) = {
+    type: "iam.servora.dev/Realm"
+    pattern: "realms/{realm}"
+    singular: "realm"
+    plural: "realms"
+  };
+
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+}
+
+message CreateRealmRequest {
+  optional string realm_id = 1 [(google.api.field_behavior) = OPTIONAL];
+  Realm realm = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListRealmsRequest {
+  int32 page_size = 1 [(google.api.field_behavior) = OPTIONAL];
+  string page_token = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+```
+
+顶层资源仍由应用显式组合相同 runtime：
+
+```go
+plan := crud.MustBuildResourcePlan[*iamv1.Realm](iamv1.RealmCRUDDescriptor())
+preparer, err := crud.NewListPreparer()
+if err != nil {
+    return err
+}
+
+prepared, err := plan.PrepareCreate(req.GetRealm())
+if err != nil {
+    return nil, err
+}
+
+query, err := preparer.PrepareList(plan, crud.ListInput{
+    Collection: "realms",
+    PageSize:   req.GetPageSize(),
+    PageToken:  req.GetPageToken(),
+})
+```
+
+这里的 `Collection: "realms"` 是稳定的内部 collection target，只用于区分 List 查询上下文并参与 page-token fingerprint。它不是公共 `parent` 字段，不会自动产生业务 scope、授权范围或 repository predicate；这些仍由 biz/repository 显式提供。嵌套资源则使用规范化 parent（例如 `req.GetParent()`）作为 collection target。
+
 ### Create
 
 ```go

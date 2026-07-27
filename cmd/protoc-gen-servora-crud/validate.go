@@ -12,7 +12,7 @@ import (
 
 func validateStandardMethods(files []*protogen.File, resources map[string]*resourceInfo) error {
 	for _, resource := range resources {
-		allowCreateList := supportsStandardCreateList(resource.patterns)
+		createList := classifyStandardCreateList(resource.patterns)
 		lifecycle := false
 		for _, file := range files {
 			if file.Desc.Package() != resource.file.Desc.Package() {
@@ -21,10 +21,10 @@ func validateStandardMethods(files []*protogen.File, resources map[string]*resou
 			for _, service := range file.Services {
 				for _, method := range service.Methods {
 					action := standardAction(method.GoName, resource)
-					if action == "" || ((action == "create" || action == "list") && !allowCreateList) {
+					if action == "" || ((action == "create" || action == "list") && createList == createListUnsupported) {
 						continue
 					}
-					standard, err := validateStandardMethod(action, method, resource)
+					standard, err := validateStandardMethod(action, method, resource, createList)
 					if err != nil {
 						return err
 					}
@@ -65,12 +65,17 @@ func standardAction(methodName string, resource *resourceInfo) string {
 	}
 }
 
-func validateStandardMethod(action string, method *protogen.Method, resource *resourceInfo) (bool, error) {
+func validateStandardMethod(action string, method *protogen.Method, resource *resourceInfo, createList createListShape) (bool, error) {
 	methodName := method.Desc.FullName()
 	resourceName := resource.message.Desc.FullName()
 	outputName := method.Output.Desc.FullName()
 	if (action == "create" || action == "update" || action == "delete") && outputName == "google.longrunning.Operation" {
 		return false, nil
+	}
+	if (action == "create" || action == "list") && createList == createListNested {
+		if err := validateRequiredString(method, "parent"); err != nil {
+			return false, err
+		}
 	}
 	switch action {
 	case "get":
@@ -81,9 +86,6 @@ func validateStandardMethod(action string, method *protogen.Method, resource *re
 			return false, err
 		}
 	case "list":
-		if err := validateRequiredString(method, "parent"); err != nil {
-			return false, err
-		}
 		if err := validateOptionalScalar(method, "page_size", protoreflect.Int32Kind); err != nil {
 			return false, err
 		}
@@ -309,21 +311,35 @@ func realOneofField(field protoreflect.FieldDescriptor) bool {
 	return oneof != nil && !oneof.IsSynthetic()
 }
 
-func supportsStandardCreateList(patterns []namePattern) bool {
+type createListShape uint8
+
+const (
+	createListUnsupported createListShape = iota
+	createListTopLevel
+	createListNested
+)
+
+func classifyStandardCreateList(patterns []namePattern) createListShape {
+	if len(patterns) == 0 {
+		return createListUnsupported
+	}
 	if len(patterns) == 1 {
-		return true
+		if patterns[0].topLevel {
+			return createListTopLevel
+		}
+		return createListNested
 	}
 	parents := make(map[string]struct{}, len(patterns))
 	for _, pattern := range patterns {
 		if pattern.topLevel {
-			return false
+			return createListUnsupported
 		}
 		if _, duplicate := parents[pattern.parentSkeleton]; duplicate {
-			return false
+			return createListUnsupported
 		}
 		parents[pattern.parentSkeleton] = struct{}{}
 	}
-	return true
+	return createListNested
 }
 
 func protoFieldName(value string) string {

@@ -186,22 +186,219 @@ func TestGenerateAcceptsEmptyAndResourceDeleteResponses(t *testing.T) {
 	}
 }
 
-func TestGenerateMultiPatternHelpersWithoutChoosingCreateListDefault(t *testing.T) {
+func TestGenerateValidatesTopLevelContractsWithoutParent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(*descriptorpb.FileDescriptorProto)
+		want   string
+	}{
+		{name: "valid top-level Create and List"},
+		{
+			name: "Create still validates resource ID",
+			mutate: func(file *descriptorpb.FileDescriptorProto) {
+				removeField(messageByName(file, "CreateUserRequest"), "user_id")
+			},
+			want: "request field user_id is required",
+		},
+		{
+			name: "List still validates pagination fields",
+			mutate: func(file *descriptorpb.FileDescriptorProto) {
+				fieldByName(messageByName(file, "ListUsersRequest"), "page_size").Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
+			},
+			want: "page_size must be an OPTIONAL singular int32",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			file := topLevelCRUDFile()
+			if test.mutate != nil {
+				test.mutate(file)
+			}
+			_, err := runGenerator(t, file, "go")
+			if test.want == "" {
+				if err != nil {
+					t.Fatalf("generate top-level CRUD: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("generate error = %v, want containing %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestGenerateValidatesNestedCreateListParent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		request string
+		mutate  func(*descriptorpb.DescriptorProto)
+	}{
+		{
+			name:    "Create missing parent",
+			request: "CreateUserRequest",
+			mutate:  func(request *descriptorpb.DescriptorProto) { removeField(request, "parent") },
+		},
+		{
+			name:    "Create parent wrong type",
+			request: "CreateUserRequest",
+			mutate: func(request *descriptorpb.DescriptorProto) {
+				fieldByName(request, "parent").Type = descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()
+			},
+		},
+		{
+			name:    "Create parent repeated",
+			request: "CreateUserRequest",
+			mutate: func(request *descriptorpb.DescriptorProto) {
+				fieldByName(request, "parent").Label = descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
+			},
+		},
+		{
+			name:    "Create parent map",
+			request: "CreateUserRequest",
+			mutate:  func(request *descriptorpb.DescriptorProto) { makeStringMapField(request, "parent") },
+		},
+		{
+			name:    "Create parent not required",
+			request: "CreateUserRequest",
+			mutate: func(request *descriptorpb.DescriptorProto) {
+				fieldByName(request, "parent").Options = &descriptorpb.FieldOptions{}
+			},
+		},
+		{
+			name:    "List missing parent",
+			request: "ListUsersRequest",
+			mutate:  func(request *descriptorpb.DescriptorProto) { removeField(request, "parent") },
+		},
+		{
+			name:    "List parent wrong type",
+			request: "ListUsersRequest",
+			mutate: func(request *descriptorpb.DescriptorProto) {
+				fieldByName(request, "parent").Type = descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()
+			},
+		},
+		{
+			name:    "List parent repeated",
+			request: "ListUsersRequest",
+			mutate: func(request *descriptorpb.DescriptorProto) {
+				fieldByName(request, "parent").Label = descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
+			},
+		},
+		{
+			name:    "List parent map",
+			request: "ListUsersRequest",
+			mutate:  func(request *descriptorpb.DescriptorProto) { makeStringMapField(request, "parent") },
+		},
+		{
+			name:    "List parent not required",
+			request: "ListUsersRequest",
+			mutate: func(request *descriptorpb.DescriptorProto) {
+				fieldByName(request, "parent").Options = &descriptorpb.FieldOptions{}
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			file := validCRUDFile()
+			test.mutate(messageByName(file, test.request))
+			_, err := runGenerator(t, file, "go")
+			const want = "request field parent must be a REQUIRED singular string"
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("generate error = %v, want containing %q", err, want)
+			}
+		})
+	}
+}
+
+func TestGenerateDistinguishableNestedPatternsUseStandardParentValidation(t *testing.T) {
 	t.Parallel()
 
 	file := validCRUDFile()
 	resource := resourceOption(messageByName(file, "User"))
 	resource.Pattern = []string{"tenants/{tenant}/users/{user}", "organizations/{organization}/users/{user}"}
-	plugin, err := runGenerator(t, file, "go")
-	if err != nil {
-		t.Fatalf("generate: %v", err)
+	removeField(messageByName(file, "CreateUserRequest"), "parent")
+	_, err := runGenerator(t, file, "go")
+	const want = "request field parent must be a REQUIRED singular string"
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("generate error = %v, want containing %q", err, want)
 	}
-	content := generatedFiles(plugin)["test/v1/user_crud.pb.go"]
-	for _, constructor := range []string{"NewUserNameForTenantsUsers", "NewUserNameForOrganizationsUsers"} {
-		if !strings.Contains(content, constructor) {
-			t.Fatalf("missing multi-pattern constructor %s", constructor)
-		}
+}
+
+func TestGenerateAmbiguousPatternsKeepHelpersWithoutChoosingDefault(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		patterns     []string
+		constructors []string
+	}{
+		{
+			name:         "multiple top-level patterns",
+			patterns:     []string{"users/{user}", "members/{user}"},
+			constructors: []string{"NewUserNameForUsers", "NewUserNameForMembers"},
+		},
+		{
+			name:         "mixed top-level and nested patterns",
+			patterns:     []string{"users/{user}", "tenants/{tenant}/users/{user}"},
+			constructors: []string{"NewUserNameForUsers", "NewUserNameForTenantsUsers"},
+		},
+		{
+			name:         "duplicate parent skeleton",
+			patterns:     []string{"tenants/{tenant}/users/{user}", "tenants/{tenant}/members/{user}"},
+			constructors: []string{"NewUserNameForTenantsUsers", "NewUserNameForTenantsMembers"},
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			file := validCRUDFile()
+			resourceOption(messageByName(file, "User")).Pattern = test.patterns
+			removeField(messageByName(file, "ListUsersRequest"), "parent")
+			removeField(messageByName(file, "CreateUserRequest"), "parent")
+			fieldByName(messageByName(file, "ListUsersRequest"), "page_size").Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
+			plugin, err := runGenerator(t, file, "go")
+			if err != nil {
+				t.Fatalf("generate ambiguous pattern helpers: %v", err)
+			}
+			content := generatedFiles(plugin)["test/v1/user_crud.pb.go"]
+			for _, constructor := range test.constructors {
+				if !strings.Contains(content, constructor) {
+					t.Fatalf("missing multi-pattern constructor %s", constructor)
+				}
+			}
+			if strings.Contains(content, "func NewUserName(") {
+				t.Fatal("generated a default constructor for ambiguous patterns")
+			}
+		})
+	}
+}
+func topLevelCRUDFile() *descriptorpb.FileDescriptorProto {
+	file := validCRUDFile()
+	resourceOption(messageByName(file, "User")).Pattern = []string{"users/{user}"}
+	removeField(messageByName(file, "ListUsersRequest"), "parent")
+	removeField(messageByName(file, "CreateUserRequest"), "parent")
+	return file
+}
+
+func makeStringMapField(request *descriptorpb.DescriptorProto, name string) {
+	entryName := "ParentEntry"
+	entry := message(
+		entryName,
+		field("key", 1, descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL, ""),
+		field("value", 2, descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL, ""),
+	)
+	entry.Options = &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)}
+	request.NestedType = append(request.NestedType, entry)
+	mapField := fieldByName(request, name)
+	mapField.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+	mapField.TypeName = proto.String(".test.v1." + request.GetName() + "." + entryName)
+	mapField.Label = descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
 }
 
 func runGenerator(t *testing.T, file *descriptorpb.FileDescriptorProto, target string) (*protogen.Plugin, error) {
