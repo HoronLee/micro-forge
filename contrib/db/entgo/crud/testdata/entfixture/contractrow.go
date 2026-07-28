@@ -3,6 +3,7 @@
 package entfixture
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -28,6 +29,8 @@ type ContractRow struct {
 	TextValue string `json:"text_value,omitempty"`
 	// UniqueText holds the value of the "unique_text" field.
 	UniqueText string `json:"unique_text,omitempty"`
+	// Profile holds the value of the "profile" field.
+	Profile map[string]interface{} `json:"profile,omitempty"`
 	// NumericValue holds the value of the "numeric_value" field.
 	NumericValue int32 `json:"numeric_value,omitempty"`
 	// NullableText holds the value of the "nullable_text" field.
@@ -48,6 +51,8 @@ func (*ContractRow) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case contractrow.FieldProfile:
+			values[i] = new([]byte)
 		case contractrow.FieldID, contractrow.FieldNumericValue, contractrow.FieldDurationValue, contractrow.FieldEnumNumber:
 			values[i] = new(sql.NullInt64)
 		case contractrow.FieldDeletedBy, contractrow.FieldTextValue, contractrow.FieldUniqueText, contractrow.FieldNullableText:
@@ -107,6 +112,14 @@ func (_m *ContractRow) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field unique_text", values[i])
 			} else if value.Valid {
 				_m.UniqueText = value.String
+			}
+		case contractrow.FieldProfile:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field profile", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Profile); err != nil {
+					return fmt.Errorf("unmarshal field profile: %w", err)
+				}
 			}
 		case contractrow.FieldNumericValue:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -201,6 +214,9 @@ func (_m *ContractRow) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("unique_text=")
 	builder.WriteString(_m.UniqueText)
+	builder.WriteString(", ")
+	builder.WriteString("profile=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Profile))
 	builder.WriteString(", ")
 	builder.WriteString("numeric_value=")
 	builder.WriteString(fmt.Sprintf("%v", _m.NumericValue))

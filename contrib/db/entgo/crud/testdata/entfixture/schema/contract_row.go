@@ -22,6 +22,7 @@ func (ContractRow) Fields() []ent.Field {
 		field.Uint32("id"),
 		field.String("text_value").Default(""),
 		field.String("unique_text"),
+		field.JSON("profile", map[string]any{}),
 		field.Int32("numeric_value"),
 		field.String("nullable_text").Optional().Nillable(),
 		field.Time("timestamp_value").Default(time.Now).Immutable(),

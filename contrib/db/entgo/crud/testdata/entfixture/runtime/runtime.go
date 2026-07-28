@@ -26,21 +26,21 @@ func init() {
 	// contractrow.DefaultTextValue holds the default value on creation for the text_value field.
 	contractrow.DefaultTextValue = contractrowDescTextValue.Default.(string)
 	// contractrowDescTimestampValue is the schema descriptor for timestamp_value field.
-	contractrowDescTimestampValue := contractrowFields[5].Descriptor()
+	contractrowDescTimestampValue := contractrowFields[6].Descriptor()
 	// contractrow.DefaultTimestampValue holds the default value on creation for the timestamp_value field.
 	contractrow.DefaultTimestampValue = contractrowDescTimestampValue.Default.(func() time.Time)
 	// contractrowDescUpdatedTimestamp is the schema descriptor for updated_timestamp field.
-	contractrowDescUpdatedTimestamp := contractrowFields[6].Descriptor()
+	contractrowDescUpdatedTimestamp := contractrowFields[7].Descriptor()
 	// contractrow.DefaultUpdatedTimestamp holds the default value on creation for the updated_timestamp field.
 	contractrow.DefaultUpdatedTimestamp = contractrowDescUpdatedTimestamp.Default.(func() time.Time)
 	// contractrow.UpdateDefaultUpdatedTimestamp holds the default value on update for the updated_timestamp field.
 	contractrow.UpdateDefaultUpdatedTimestamp = contractrowDescUpdatedTimestamp.UpdateDefault.(func() time.Time)
 	// contractrowDescDurationValue is the schema descriptor for duration_value field.
-	contractrowDescDurationValue := contractrowFields[7].Descriptor()
+	contractrowDescDurationValue := contractrowFields[8].Descriptor()
 	// contractrow.DefaultDurationValue holds the default value on creation for the duration_value field.
 	contractrow.DefaultDurationValue = time.Duration(contractrowDescDurationValue.Default.(int64))
 	// contractrowDescEnumNumber is the schema descriptor for enum_number field.
-	contractrowDescEnumNumber := contractrowFields[8].Descriptor()
+	contractrowDescEnumNumber := contractrowFields[9].Descriptor()
 	// contractrow.DefaultEnumNumber holds the default value on creation for the enum_number field.
 	contractrow.DefaultEnumNumber = crudpb.CrudErrorReason(contractrowDescEnumNumber.Default.(int32))
 }

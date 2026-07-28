@@ -248,6 +248,43 @@ type UserRepo interface {
 
 Filter 使用 AIP-160 的确定性子集。实际可用字段和操作同时受 resource descriptor 与 repository `ListFields` 限制。客户端文本不会直接拼入 SQL。
 
+string 字段的 `=`/`!=` 额外接受确定性的边缘 wildcard：
+
+|quoted value|类型化语义|
+|---|---|
+|`"foo"`|Exact `foo`|
+|`"foo*"`|Prefix `foo`|
+|`"*foo"`|Suffix `foo`|
+|`"*foo*"`|Contains `foo`|
+|`"*"`|匹配任意非 NULL string，包括空字符串|
+
+连续边缘 marker 会规范化；例如 `"**foo**"` 统一变为 `"*foo*"`。去除边缘 marker 后仍含未转义 `*` 的 `"foo*bar"` 属于内部 glob，会在 repository/数据库访问前返回 `INVALID_FILTER`。Prefix、Suffix、Contains 只允许 `=`/`!=`；范围操作符和 repeated string `:` 只接受 Exact。
+
+string 会先经过 AIP quoted-string 解码，再经过 wildcard 层解码。wildcard 层的 `\*` 表示 literal `*`，`\\` 表示 literal `\`；因此精确匹配 `foo*` 时，各层写法不同：
+
+```text
+filter 原文：display_name = "foo\\*"
+```
+
+```go
+input := crud.ListInput{
+    Filter: `display_name = "foo\\*"`,
+}
+```
+
+```bash
+curl --get 'http://127.0.0.1:28080/v1/tenants/acme/users' \
+  --data-urlencode 'filter=display_name = "foo\\*"'
+```
+
+```json
+{
+  "filter": "display_name = \"foo\\\\*\""
+}
+```
+
+未转义边缘星号是 wildcard；raw filter 调用方升级后必须按上述方式转义 literal 星号。标准 List Proto 仍只使用现有 `filter` string，不增加 wildcard 字段或 operator enum。
+
 默认安全限制：
 
 - filter：8 KiB、128 AST 节点、8 层深度、64 个 OR term；
@@ -262,6 +299,7 @@ Filter 使用 AIP-160 的确定性子集。实际可用字段和操作同时受 
 - `skip` 可单独使用，也可在 token 恢复 cursor 后额外跳过资源；它表示资源数量，不是页数。
 - token fingerprint 绑定资源类型、collection、规范化 filter、最终稳定排序、比较 profile 和业务 scope；不绑定 `page_size` 或当前 `skip`。
 - filter、order、collection、scope 或 tombstone 可见范围改变后，旧 token 会返回 `INVALID_PAGE_TOKEN`。
+- fingerprint 无条件包含框架私有 filter profile `servora.crud.filter.v1`，包括空 filter 和普通 Exact filter。该 profile 首次启用后，升级前生成的 v1 token 会因 fingerprint 失配返回 `INVALID_PAGE_TOKEN`；payload schema 和 `CurrentPageTokenVersion` 仍为 v1。
 - token 不授予权限。每页查询都必须重新应用当前 authn/authz 与业务 scope。
 - 默认 codec 是 deterministic Proto binary + unpadded Base64URL，未签名。需要完整性或保密性时，通过 `PageTokenCodec` 替换；不要让客户端依赖内部 payload。
 - Timestamp cursor 同时保存 UTC instant 与原始整分钟时区 offset；offset 只用于重建 SQL keyset 参数，避免 SQLite 文本时间在 Proto UTC 归一化后改变续页比较值。非法或错配 offset 会在数据库访问前返回 `INVALID_PAGE_TOKEN`。
@@ -332,6 +370,28 @@ fields, err := entcrud.NewListFields[*ent.User](
 - `CursorKey` 是后端私有的非空唯一 tie-breaker；公共 PB 不必暴露数据库 ID。
 - `WithComparisonProfile`、`WithQueryConverter`、`WithCursorConverter` 用于显式存储差异；profile 改变会使旧 token 失效。
 - 常见 JSON 列路径使用 `JSONPath`；relation、computed、数据库函数或其它特化语义使用 `Custom`/`CustomOrder`。
+
+普通 string `Bind(...).Filter()` 和 string `JSONPath(...).Filter()` 自动开放 Exact、Prefix、Suffix、Contains，不提供 `.Wildcard()`、`.Prefix()` 等 capability gate。需要限制 match kind 的字段使用 `Custom` 并显式读取类型化值：
+
+```go
+entcrud.Custom(userv1.UserFields.Email, "email_exact", func(
+    operator crud.FilterOperator,
+    value crud.FilterValue,
+) (entcrud.SelectorPredicate, error) {
+    match, ok := value.StringMatch()
+    if !ok || match.Kind() != crud.StringMatchExact {
+        return nil, errors.New("email only supports Exact")
+    }
+    if operator != crud.FilterOperatorEqual {
+        return nil, errors.New("email only supports =")
+    }
+    return func(selector *sql.Selector) *sql.Predicate {
+        return sql.EQ(selector.C(entuser.FieldEmail), match.Literal())
+    }, nil
+}).Filter()
+```
+
+`StringValue()` 已删除；enum 使用 `EnumSymbol()`，string 使用 `StringMatch()`。string `QueryConverter` 仍接收完整 `FilterValue`，必须读取 match、只转换 `Literal()`，并保持原 kind 的全部内建语义。converter 主动拒绝客户端 literal 时返回 `INVALID_FILTER`；对 Prefix/Suffix/Contains 返回 nil error 但产出非 string 属于 repository wiring 错误，返回 `INTERNAL`。哈希等不能保持 wildcard 语义的转换必须改为 `CustomPredicate`，显式处理或拒绝各 kind。
 
 repository 先把 biz scope 映射为 Ent predicate，再调用一次 adapter：
 
@@ -469,16 +529,40 @@ import { UserName, UserFields, UserUpdateFields } from "./user.crud"
 import {
   buildFilter,
   buildOrderBy,
+  filterContains,
+  filterPrefix,
+  filterSuffix,
   makeUpdateMask,
+  rawFilterValue,
   firstPage,
   advancePager,
 } from "@servora/proto-utils/crud"
 
 const name = UserName.format({ tenant: "acme", user: "alice" })
-const filter = buildFilter(UserFields, {
+const exact = buildFilter(UserFields, {
   field: UserFields.email,
-  op: "=",
+  operator: "=",
   value: "alice@example.com",
+})
+const prefix = buildFilter(UserFields, {
+  field: UserFields.displayName,
+  operator: "=",
+  value: filterPrefix("Ali"),
+})
+const suffix = buildFilter(UserFields, {
+  field: UserFields.email,
+  operator: "!=",
+  value: filterSuffix("@blocked.example"),
+})
+const contains = buildFilter(UserFields, {
+  field: UserFields.displayName,
+  operator: "=",
+  value: filterContains("ice"),
+})
+const explicitRaw = buildFilter(UserFields, {
+  field: UserFields.displayName,
+  operator: "=",
+  value: rawFilterValue('"Ali*"'),
 })
 const orderBy = buildOrderBy(UserFields, [
   { field: UserFields.createTime, direction: "desc" },
@@ -489,6 +573,8 @@ const updateMask = makeUpdateMask(UserUpdateFields, {
 ```
 
 `UserName.parse` 抛出 `ResourceNameError`，`tryParse` 返回 `null`。`makeUpdateMask` 以 own-key presence 判断意图，因此显式 `undefined` 仍会选中字段。
+
+普通 TypeScript string 永远表示 Exact；其中的 `*` 与 `\` 会先做 wildcard 层转义，再做 quoted-string 编码。Prefix/Suffix/Contains 必须使用对应 typed helper；helper 与 `<`、`<=`、`>`、`>=`、`:` 组合时 `buildFilter` 会本地抛出 `RangeError`。三个 helper 都接受空字符串并统一输出 `"*"`。`rawFilterValue` 是有意绕过 typed helper 的原样出口，不重复实现服务端 parser；调用方负责 raw text 的语法意图，服务端仍执行权威字段类型和 operator 校验。
 
 生成的 HTTP client 通过 `createRequestHandler` 接入 transport。ProtoJSON response 可显式使用 `responseType: "json"`；Kratos 错误由 `ApiError` 保留响应体供业务解析。
 
@@ -512,13 +598,17 @@ just web-typecheck
 just web-build
 ```
 
-发布前由开发者自行启动依赖，并显式运行：
+发布前由开发者显式准备依赖并运行。`servora-platform/docker-compose.yaml` 提供与本地验证一致的 PostgreSQL 18 服务：
 
 ```bash
+cd ../servora-platform
+docker compose up -d --wait postgres
+
+cd ../servora
 SERVORA_ENT_SQLITE_DSN='file:servora_crud_live?mode=memory&cache=shared&_fk=1' \
   just test-ent-sqlite
 
-SERVORA_ENT_POSTGRES_DSN='postgres://user:password@127.0.0.1:5432/db?sslmode=disable' \
+SERVORA_ENT_POSTGRES_DSN='postgres://postgres:postgres@127.0.0.1:5432/servora_platform?sslmode=disable' \
   just test-ent-postgres
 ```
 
@@ -535,6 +625,14 @@ SERVORA_ENT_POSTGRES_DSN='postgres://user:password@127.0.0.1:5432/db?sslmode=dis
 - nullable `nickname` 的 Clear→NULL、非空 `display_name` 的 Clear→空字符串；
 - INPUT_ONLY `temporary_password` → private `password_hash`；
 - Vue 控制台只消费 generated TypeScript client 与 `@servora/proto-utils`。
+
+本地跨仓回归必须通过 Servora-Kit 顶层 `go.work` 使用当前框架源码；service Makefile 会解析并校验该 workspace，而不是静默使用 `servora-platform/go.work` 中已发布的框架版本：
+
+```bash
+cd servora-platform/app/example/service
+SERVORA_EXAMPLE_SQLITE_DSN='file:servora_reference_live?mode=memory&cache=shared&_fk=1' \
+  make test.integration
+```
 
 本地运行：
 

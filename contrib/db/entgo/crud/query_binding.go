@@ -3,6 +3,7 @@ package crud
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect"
@@ -93,6 +94,15 @@ func (fields *ListFields[PO]) resolveFieldPredicate(node corecrud.FilterNode) (S
 		}
 		return binding.resolveNullPredicate(node.Operator(), value)
 	}
+	var stringMatch corecrud.StringMatch
+	isStringValue := value.Kind() == corecrud.FilterValueString
+	if isStringValue {
+		var ok bool
+		stringMatch, ok = value.StringMatch()
+		if !ok || stringMatch.Kind() == corecrud.StringMatchInvalid {
+			return nil, internalAdapterError("filter", "field %q received an invalid StringMatch", field.Path())
+		}
+	}
 	if binding.customPredicate != nil {
 		factory, err := binding.customPredicate(node.Operator(), value)
 		if err != nil {
@@ -116,13 +126,23 @@ func (fields *ListFields[PO]) resolveFieldPredicate(node corecrud.FilterNode) (S
 			return sqljson.ValueContains(binding.column, argument, binding.jsonOptions()...)
 		}, nil
 	}
+	if isStringValue {
+		literal, ok := argument.(string)
+		if ok {
+			return binding.resolveStringPredicate(node.Operator(), stringMatch.Kind(), literal)
+		}
+		if stringMatch.Kind() != corecrud.StringMatchExact {
+			return nil, internalAdapterError(
+				"filter",
+				"field %q converter returned %T for StringMatch kind %d",
+				field.Path(), argument, stringMatch.Kind(),
+			)
+		}
+	}
 	switch binding.kind {
 	case bindingColumn:
 		return func(selector *sql.Selector) *sql.Predicate {
-			predicate, _ := columnComparison(
-				selector.C(binding.column), node.Operator(), argument,
-				binding.logicalType == corecrud.LogicalString,
-			)
+			predicate, _ := columnComparison(selector.C(binding.column), node.Operator(), argument, false)
 			return predicate
 		}, nil
 	case bindingJSONPath:
@@ -142,8 +162,11 @@ func (binding fieldBinding) filterArgument(value corecrud.FilterValue) (any, err
 	}
 	switch value.Kind() {
 	case corecrud.FilterValueString:
-		result, _ := value.StringValue()
-		return result, nil
+		match, ok := value.StringMatch()
+		if !ok {
+			return nil, fmt.Errorf("invalid StringMatch")
+		}
+		return match.Literal(), nil
 	case corecrud.FilterValueBool:
 		result, _ := value.BoolValue()
 		return result, nil
@@ -191,13 +214,16 @@ func (binding fieldBinding) resolveNullPredicate(
 		return factory, nil
 	}
 	if binding.kind == bindingJSONPath {
-		if operator == corecrud.FilterOperatorEqual {
-			return func(*sql.Selector) *sql.Predicate {
-				return sqljson.ValueIsNull(binding.column, binding.jsonOptions()...)
-			}, nil
-		}
+		expression := jsonStringExpression(binding.column, binding.jsonOptions())
 		return func(*sql.Selector) *sql.Predicate {
-			return sqljson.ValueIsNotNull(binding.column, binding.jsonOptions()...)
+			return sql.P(func(builder *sql.Builder) {
+				expression(builder)
+				if operator == corecrud.FilterOperatorEqual {
+					builder.WriteString(" IS NULL")
+					return
+				}
+				builder.WriteString(" IS NOT NULL")
+			})
 		}, nil
 	}
 	if operator == corecrud.FilterOperatorEqual {
@@ -212,6 +238,165 @@ func (binding fieldBinding) resolveNullPredicate(
 
 func (binding fieldBinding) jsonOptions() []sqljson.Option {
 	return []sqljson.Option{sqljson.Path(binding.jsonPath...)}
+}
+
+type stringSQLExpression func(*sql.Builder)
+
+func (binding fieldBinding) resolveStringPredicate(
+	operator corecrud.FilterOperator,
+	kind corecrud.StringMatchKind,
+	literal string,
+) (SelectorPredicate, error) {
+	if err := validateStringMatchComparison(operator, kind); err != nil {
+		return nil, err
+	}
+	switch binding.kind {
+	case bindingColumn:
+		return func(selector *sql.Selector) *sql.Predicate {
+			predicate, _ := stringMatchComparison(
+				columnStringExpression(selector.C(binding.column)), operator, kind, literal,
+			)
+			return predicate
+		}, nil
+	case bindingJSONPath:
+		predicate, err := stringMatchComparison(
+			jsonStringExpression(binding.column, binding.jsonOptions()), operator, kind, literal,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return func(*sql.Selector) *sql.Predicate { return predicate }, nil
+	default:
+		return nil, internalAdapterError("filter", "string match requires a column or JSONPath binding")
+	}
+}
+
+func columnStringExpression(column string) stringSQLExpression {
+	return func(builder *sql.Builder) {
+		builder.Ident(column)
+	}
+}
+
+func jsonStringExpression(column string, options []sqljson.Option) stringSQLExpression {
+	textOptions := make([]sqljson.Option, 0, len(options)+1)
+	textOptions = append(textOptions, sqljson.Unquote(true))
+	textOptions = append(textOptions, options...)
+	rawExpression := sqljson.ValuePath(column, options...)
+	textExpression := sqljson.ValuePath(column, textOptions...)
+	return func(builder *sql.Builder) {
+		if builder.Dialect() == dialect.MySQL {
+			builder.WriteString("CASE WHEN JSON_TYPE(")
+			builder.Join(rawExpression)
+			builder.WriteString(") = 'NULL' THEN NULL ELSE ")
+			builder.Join(textExpression)
+			builder.WriteString(" END")
+			return
+		}
+		builder.Join(textExpression)
+	}
+}
+
+func stringMatchComparison(
+	expression stringSQLExpression,
+	operator corecrud.FilterOperator,
+	kind corecrud.StringMatchKind,
+	literal string,
+) (*sql.Predicate, error) {
+	if err := validateStringMatchComparison(operator, kind); err != nil {
+		return nil, err
+	}
+	if expression == nil {
+		return nil, internalAdapterError("filter", "string SQL expression is nil")
+	}
+	if kind == corecrud.StringMatchExact {
+		op, err := comparisonOp(operator)
+		if err != nil {
+			return nil, err
+		}
+		return sql.P(func(builder *sql.Builder) {
+			writeBinaryStringExpression(builder, expression)
+			builder.WriteOp(op).Arg(literal)
+		}), nil
+	}
+	return sql.P(func(builder *sql.Builder) {
+		if literal == "" && kind == corecrud.StringMatchContains && operator == corecrud.FilterOperatorEqual {
+			writeBinaryStringExpression(builder, expression)
+			builder.WriteString(" IS NOT NULL")
+			return
+		}
+		negated := operator == corecrud.FilterOperatorNotEqual
+		if negated {
+			builder.WriteString("NOT (")
+		}
+		switch builder.Dialect() {
+		case dialect.Postgres, dialect.MySQL:
+			writeBinaryStringExpression(builder, expression)
+			builder.WriteString(" LIKE ").Arg(escapedLikePattern(kind, literal)).WriteString(" ESCAPE '!'")
+		default:
+			writeSQLiteStringMatch(builder, expression, kind, literal)
+		}
+		if negated {
+			builder.WriteByte(')')
+		}
+	}), nil
+}
+
+func validateStringMatchComparison(operator corecrud.FilterOperator, kind corecrud.StringMatchKind) error {
+	if kind == corecrud.StringMatchInvalid {
+		return internalAdapterError("filter", "invalid StringMatch kind")
+	}
+	if kind != corecrud.StringMatchExact &&
+		operator != corecrud.FilterOperatorEqual && operator != corecrud.FilterOperatorNotEqual {
+		return internalAdapterError("filter", "StringMatch kind %d uses operator %q", kind, operator)
+	}
+	if kind == corecrud.StringMatchExact {
+		if _, err := comparisonOp(operator); err != nil {
+			return internalAdapterError("filter", "exact StringMatch uses operator %q", operator)
+		}
+	}
+	return nil
+}
+
+func escapedLikePattern(kind corecrud.StringMatchKind, literal string) string {
+	var pattern strings.Builder
+	pattern.Grow(len(literal) + 2)
+	if kind == corecrud.StringMatchSuffix || kind == corecrud.StringMatchContains {
+		pattern.WriteByte('%')
+	}
+	for index := range len(literal) {
+		current := literal[index]
+		if current == '!' || current == '%' || current == '_' {
+			pattern.WriteByte('!')
+		}
+		pattern.WriteByte(current)
+	}
+	if kind == corecrud.StringMatchPrefix || kind == corecrud.StringMatchContains {
+		pattern.WriteByte('%')
+	}
+	return pattern.String()
+}
+
+func writeSQLiteStringMatch(
+	builder *sql.Builder,
+	expression stringSQLExpression,
+	kind corecrud.StringMatchKind,
+	literal string,
+) {
+	switch kind {
+	case corecrud.StringMatchPrefix, corecrud.StringMatchContains:
+		builder.WriteString("instr(")
+		writeBinaryStringExpression(builder, expression)
+		builder.Comma().Arg(literal).WriteByte(')')
+		if kind == corecrud.StringMatchPrefix {
+			builder.WriteString(" = 1")
+		} else {
+			builder.WriteString(" > 0")
+		}
+	case corecrud.StringMatchSuffix:
+		builder.WriteString("substr(")
+		expression(builder)
+		builder.WriteString(", -length(").Arg(literal).WriteString(")) COLLATE BINARY = ").Arg(literal)
+	}
 }
 
 func columnComparison(
@@ -251,19 +436,22 @@ func binaryStringComparison(
 		return nil, err
 	}
 	return sql.P(func(builder *sql.Builder) {
-		writeBinaryStringExpression(builder, column)
+		writeBinaryStringExpression(builder, columnStringExpression(column))
 		builder.WriteOp(op).Arg(argument)
 	}), nil
 }
 
-func writeBinaryStringExpression(builder *sql.Builder, column string) {
+func writeBinaryStringExpression(builder *sql.Builder, expression stringSQLExpression) {
 	switch builder.Dialect() {
 	case dialect.MySQL:
-		builder.WriteString("BINARY ").Ident(column)
+		builder.WriteString("BINARY ")
+		expression(builder)
 	case dialect.Postgres:
-		builder.Ident(column).WriteString(` COLLATE "C"`)
+		expression(builder)
+		builder.WriteString(` COLLATE "C"`)
 	default:
-		builder.Ident(column).WriteString(" COLLATE BINARY")
+		expression(builder)
+		builder.WriteString(" COLLATE BINARY")
 	}
 }
 

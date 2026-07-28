@@ -118,6 +118,12 @@ func (_u *ContractRowUpdate) SetNillableUniqueText(v *string) *ContractRowUpdate
 	return _u
 }
 
+// SetProfile sets the "profile" field.
+func (_u *ContractRowUpdate) SetProfile(v map[string]interface{}) *ContractRowUpdate {
+	_u.mutation.SetProfile(v)
+	return _u
+}
+
 // SetNumericValue sets the "numeric_value" field.
 func (_u *ContractRowUpdate) SetNumericValue(v int32) *ContractRowUpdate {
 	_u.mutation.ResetNumericValue()
@@ -293,6 +299,9 @@ func (_u *ContractRowUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if value, ok := _u.mutation.UniqueText(); ok {
 		_spec.SetField(contractrow.FieldUniqueText, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Profile(); ok {
+		_spec.SetField(contractrow.FieldProfile, field.TypeJSON, value)
+	}
 	if value, ok := _u.mutation.NumericValue(); ok {
 		_spec.SetField(contractrow.FieldNumericValue, field.TypeInt32, value)
 	}
@@ -427,6 +436,12 @@ func (_u *ContractRowUpdateOne) SetNillableUniqueText(v *string) *ContractRowUpd
 	if v != nil {
 		_u.SetUniqueText(*v)
 	}
+	return _u
+}
+
+// SetProfile sets the "profile" field.
+func (_u *ContractRowUpdateOne) SetProfile(v map[string]interface{}) *ContractRowUpdateOne {
+	_u.mutation.SetProfile(v)
 	return _u
 }
 
@@ -634,6 +649,9 @@ func (_u *ContractRowUpdateOne) sqlSave(ctx context.Context) (_node *ContractRow
 	}
 	if value, ok := _u.mutation.UniqueText(); ok {
 		_spec.SetField(contractrow.FieldUniqueText, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Profile(); ok {
+		_spec.SetField(contractrow.FieldProfile, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.NumericValue(); ok {
 		_spec.SetField(contractrow.FieldNumericValue, field.TypeInt32, value)

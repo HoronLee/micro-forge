@@ -72,12 +72,15 @@ func TestJSONPathAndCustomBindings(t *testing.T) {
 			if operator != corecrud.FilterOperatorEqual {
 				return nil, fmt.Errorf("unsupported operator %s", operator)
 			}
-			plan, ok := value.StringValue()
+			match, ok := value.StringMatch()
 			if !ok {
-				return nil, fmt.Errorf("expected string")
+				return nil, fmt.Errorf("expected string match")
+			}
+			if match.Kind() != corecrud.StringMatchExact {
+				return nil, fmt.Errorf("unsupported string match kind %d", match.Kind())
 			}
 			return func(selector *sql.Selector) *sql.Predicate {
-				return sql.EQ(selector.C("plan_code"), strings.ToUpper(plan))
+				return sql.EQ(selector.C("plan_code"), strings.ToUpper(match.Literal()))
 			}, nil
 		}).Filter(),
 		Bind(examplev1.UserFields.CreateTime, "created_at").Order(),
@@ -108,11 +111,11 @@ func TestBindingAndCursorConverters(t *testing.T) {
 		Columns(testValidColumn("email_hash", "created_at", "id")),
 		Bind(examplev1.UserFields.Email, "email_hash").Filter().WithQueryConverter(
 			func(value corecrud.FilterValue) (any, error) {
-				email, ok := value.StringValue()
+				match, ok := value.StringMatch()
 				if !ok {
-					return nil, fmt.Errorf("expected string")
+					return nil, fmt.Errorf("expected string match")
 				}
-				return "hash:" + email, nil
+				return match.Literal(), nil
 			},
 		),
 		Bind(examplev1.UserFields.CreateTime, "created_at").Order(),
@@ -136,7 +139,7 @@ func TestBindingAndCursorConverters(t *testing.T) {
 	}
 	selector.Where(predicate)
 	_, arguments := selector.Query()
-	if got, want := fmt.Sprint(arguments), `[hash:person@example.com]`; got != want {
+	if got, want := fmt.Sprint(arguments), `[person@example.com]`; got != want {
 		t.Fatalf("arguments = %s, want %s", got, want)
 	}
 	converted, err := fields.cursorKeys[0].converter(int64(42))
@@ -148,7 +151,7 @@ func TestBindingAndCursorConverters(t *testing.T) {
 func mustListFields(t *testing.T, bindings ...Binding) *ListFields[struct{}] {
 	t.Helper()
 	options := []ListFieldsOption{Columns(testValidColumn(
-		"email", "profile", "plan_rank", "plan_code", "created_at", "id",
+		"email", "profile", "nullable_text", "plan_rank", "plan_code", "created_at", "id",
 	))}
 	for _, binding := range bindings {
 		options = append(options, binding)

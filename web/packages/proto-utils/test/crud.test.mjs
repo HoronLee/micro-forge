@@ -7,6 +7,9 @@ import {
   applyPager,
   buildFilter,
   buildOrderBy,
+  filterContains,
+  filterPrefix,
+  filterSuffix,
   firstPage,
   makeUpdateMask,
   rawFilterValue,
@@ -16,6 +19,9 @@ import { UserName } from "../dist/gen/servora/example/v1/example.crud.js";
 
 const nameVectors = JSON.parse(
   await readFile(new URL("../../../../conformance/crud/resource_names.json", import.meta.url), "utf8"),
+);
+const stringMatchVectors = JSON.parse(
+  await readFile(new URL("../../../../conformance/crud/string_matches.json", import.meta.url), "utf8"),
 );
 
 const fields = {
@@ -69,6 +75,81 @@ test("buildFilter renders typed groups and rejects invalid values", () => {
         value: Number.NaN,
       }),
     /must be finite/,
+  );
+});
+
+test("buildFilter rejects unknown operators at runtime", () => {
+  assert.throws(
+    () =>
+      buildFilter(fields, {
+        field: "display_name",
+        operator: "~=",
+        value: "foo",
+      }),
+    RangeError,
+  );
+});
+
+test("buildFilter matches shared string-match conformance vectors", () => {
+  const builders = {
+    exact: (value) => value,
+    prefix: filterPrefix,
+    suffix: filterSuffix,
+    contains: filterContains,
+    raw: rawFilterValue,
+  };
+  for (const vector of stringMatchVectors.valid) {
+    const value = builders[vector.builder.kind](vector.builder.value);
+    assert.equal(
+      buildFilter(fields, {
+        field: stringMatchVectors.field,
+        operator: vector.operator,
+        value,
+      }),
+      vector.wireFilter,
+      vector.name,
+    );
+  }
+});
+
+test("typed wildcard helpers are immutable and reject non-equality operators", () => {
+  for (const helper of [filterPrefix, filterSuffix, filterContains]) {
+    const value = helper("foo");
+    assert.ok(Object.isFrozen(value));
+    assert.throws(() => {
+      value.value = "changed";
+    }, TypeError);
+    for (const operator of ["<", "<=", ">", ">=", ":"]) {
+      assert.throws(
+        () =>
+          buildFilter(fields, {
+            field: "display_name",
+            operator,
+            value,
+          }),
+        RangeError,
+      );
+    }
+  }
+});
+
+test("buildFilter validates fields while preserving raw filter values", () => {
+  assert.throws(
+    () =>
+      buildFilter(fields, {
+        field: "unknown",
+        operator: "=",
+        value: filterContains("foo"),
+      }),
+    /unknown filter field/,
+  );
+  assert.equal(
+    buildFilter(fields, {
+      field: "display_name",
+      operator: "=",
+      value: rawFilterValue('"foo*"'),
+    }),
+    'display_name = "foo*"',
   );
 });
 

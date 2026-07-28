@@ -62,6 +62,23 @@ const (
 	FilterValueDuration
 )
 
+// StringMatchKind identifies one normalized string comparison mode.
+type StringMatchKind uint8
+
+const (
+	StringMatchInvalid StringMatchKind = iota
+	StringMatchExact
+	StringMatchPrefix
+	StringMatchSuffix
+	StringMatchContains
+)
+
+// StringMatch is one immutable normalized string comparison value.
+type StringMatch struct {
+	kind    StringMatchKind
+	literal string
+}
+
 // FilterExpression is an immutable, typed, normalized AIP filter.
 type FilterExpression struct {
 	root       FilterNode
@@ -93,15 +110,16 @@ func (value durationScalar) proto() *durationpb.Duration {
 
 // FilterValue is one immutable, descriptor-checked filter literal.
 type FilterValue struct {
-	kind       FilterValueKind
-	text       string
-	boolValue  bool
-	intValue   int64
-	uintValue  uint64
-	floatValue float64
-	enumValue  protoreflect.EnumNumber
-	timestamp  time.Time
-	duration   durationScalar
+	kind        FilterValueKind
+	stringMatch StringMatch
+	enumSymbol  string
+	boolValue   bool
+	intValue    int64
+	uintValue   uint64
+	floatValue  float64
+	enumValue   protoreflect.EnumNumber
+	timestamp   time.Time
+	duration    durationScalar
 }
 
 // Empty reports whether no filter was provided.
@@ -142,9 +160,20 @@ func (n FilterNode) Children() []FilterNode { return slices.Clone(n.children) }
 // Kind returns the literal kind.
 func (v FilterValue) Kind() FilterValueKind { return v.kind }
 
-// StringValue returns a string or enum symbol.
-func (v FilterValue) StringValue() (string, bool) {
-	return v.text, v.kind == FilterValueString || v.kind == FilterValueEnum
+// Kind returns the normalized string comparison mode.
+func (match StringMatch) Kind() StringMatchKind { return match.kind }
+
+// Literal returns the string after wildcard markers have been removed.
+func (match StringMatch) Literal() string { return match.literal }
+
+// StringMatch returns a typed string comparison value.
+func (v FilterValue) StringMatch() (StringMatch, bool) {
+	return v.stringMatch, v.kind == FilterValueString && v.stringMatch.kind != StringMatchInvalid
+}
+
+// EnumSymbol returns the descriptor-resolved enum symbol.
+func (v FilterValue) EnumSymbol() (string, bool) {
+	return v.enumSymbol, v.kind == FilterValueEnum
 }
 
 // BoolValue returns a bool literal.
@@ -422,6 +451,9 @@ func convertHas(call *exprpb.Expr_Call, resource filterResource) (FilterNode, er
 	if err != nil {
 		return FilterNode{}, fmt.Errorf("field %q: %w", field.path, err)
 	}
+	if literal.kind == FilterValueString && literal.stringMatch.kind != StringMatchExact {
+		return FilterNode{}, fmt.Errorf("field %q: repeated string containment requires an exact string", field.path)
+	}
 	if literal.kind == FilterValueNull {
 		return FilterNode{}, fmt.Errorf("contains does not accept null")
 	}
@@ -468,7 +500,7 @@ func parseFilterValue(expression *exprpb.Expr, field protoreflect.FieldDescripto
 			if value == nil {
 				return FilterValue{}, fmt.Errorf("unknown enum value %q", name)
 			}
-			return FilterValue{kind: FilterValueEnum, text: name, enumValue: value.Number()}, nil
+			return FilterValue{kind: FilterValueEnum, enumSymbol: name, enumValue: value.Number()}, nil
 		default:
 			return FilterValue{}, fmt.Errorf("identifier %q is not a valid literal", name)
 		}
@@ -483,13 +515,73 @@ func parseFilterValue(expression *exprpb.Expr, field protoreflect.FieldDescripto
 	return FilterValue{}, fmt.Errorf("unsupported literal")
 }
 
+type stringMatchToken struct {
+	value  byte
+	marker bool
+}
+
+func parseStringMatch(value string) (StringMatch, error) {
+	tokens := make([]stringMatchToken, 0, len(value))
+	for index := 0; index < len(value); {
+		current := value[index]
+		if current == '\\' && index+1 < len(value) {
+			next := value[index+1]
+			if next == '\\' || next == '*' {
+				tokens = append(tokens, stringMatchToken{value: next})
+				index += 2
+				continue
+			}
+		}
+		tokens = append(tokens, stringMatchToken{value: current, marker: current == '*'})
+		index++
+	}
+
+	leadingMarkers := 0
+	for leadingMarkers < len(tokens) && tokens[leadingMarkers].marker {
+		leadingMarkers++
+	}
+	trailingMarkers := 0
+	for trailingMarkers < len(tokens) && tokens[len(tokens)-1-trailingMarkers].marker {
+		trailingMarkers++
+	}
+	start := leadingMarkers
+	end := len(tokens) - trailingMarkers
+	if start > end {
+		start = end
+	}
+
+	var literal strings.Builder
+	literal.Grow(max(0, end-start))
+	for _, token := range tokens[start:end] {
+		if token.marker {
+			return StringMatch{}, fmt.Errorf("internal wildcard is not supported")
+		}
+		literal.WriteByte(token.value)
+	}
+
+	kind := StringMatchExact
+	switch {
+	case leadingMarkers > 0 && trailingMarkers > 0:
+		kind = StringMatchContains
+	case leadingMarkers > 0:
+		kind = StringMatchSuffix
+	case trailingMarkers > 0:
+		kind = StringMatchPrefix
+	}
+	return StringMatch{kind: kind, literal: literal.String()}, nil
+}
+
 func parseConstantFilterValue(constant *exprpb.Constant, field protoreflect.FieldDescriptor) (FilterValue, error) {
 	switch field.Kind() {
 	case protoreflect.StringKind:
 		if _, ok := constant.GetConstantKind().(*exprpb.Constant_StringValue); !ok {
 			return FilterValue{}, fmt.Errorf("expected string literal")
 		}
-		return FilterValue{kind: FilterValueString, text: constant.GetStringValue()}, nil
+		match, err := parseStringMatch(constant.GetStringValue())
+		if err != nil {
+			return FilterValue{}, err
+		}
+		return FilterValue{kind: FilterValueString, stringMatch: match}, nil
 	case protoreflect.BoolKind:
 		if _, ok := constant.GetConstantKind().(*exprpb.Constant_BoolValue); !ok {
 			return FilterValue{}, fmt.Errorf("expected bool literal")
@@ -678,6 +770,10 @@ func validateFilterOperator(operator FilterOperator, field protoreflect.FieldDes
 		}
 		return nil
 	}
+	if value.kind == FilterValueString && value.stringMatch.kind != StringMatchExact &&
+		operator != FilterOperatorEqual && operator != FilterOperatorNotEqual {
+		return fmt.Errorf("wildcard string match only supports = and !=")
+	}
 	if field.Kind() == protoreflect.BoolKind || field.Kind() == protoreflect.EnumKind {
 		if operator != FilterOperatorEqual && operator != FilterOperatorNotEqual {
 			return fmt.Errorf("%s only supports = and !=", field.Kind())
@@ -845,11 +941,11 @@ func renderFilterValue(value FilterValue) string {
 	case FilterValueNull:
 		return "null"
 	case FilterValueString:
-		return strconv.Quote(value.text)
+		return renderStringMatch(value.stringMatch)
 	case FilterValueBool:
 		return strconv.FormatBool(value.boolValue)
 	case FilterValueEnum:
-		return value.text
+		return value.enumSymbol
 	case FilterValueInt64:
 		return strconv.FormatInt(value.intValue, 10)
 	case FilterValueUint64:
@@ -863,6 +959,31 @@ func renderFilterValue(value FilterValue) string {
 	default:
 		return ""
 	}
+}
+
+func renderStringMatch(match StringMatch) string {
+	if match.kind == StringMatchInvalid {
+		return ""
+	}
+	if match.literal == "" && match.kind != StringMatchExact {
+		return strconv.Quote("*")
+	}
+	var pattern strings.Builder
+	pattern.Grow(len(match.literal) + 2)
+	if match.kind == StringMatchSuffix || match.kind == StringMatchContains {
+		pattern.WriteByte('*')
+	}
+	for index := range len(match.literal) {
+		current := match.literal[index]
+		if current == '\\' || current == '*' {
+			pattern.WriteByte('\\')
+		}
+		pattern.WriteByte(current)
+	}
+	if match.kind == StringMatchPrefix || match.kind == StringMatchContains {
+		pattern.WriteByte('*')
+	}
+	return strconv.Quote(pattern.String())
 }
 
 func formatProtoDuration(value durationScalar) string {

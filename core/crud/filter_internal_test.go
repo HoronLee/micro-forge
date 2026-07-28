@@ -2,6 +2,7 @@ package crud
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -49,6 +50,81 @@ func TestParseFilterSupportsBoolAndRepeatedContainment(t *testing.T) {
 				t.Fatalf("parseFilter(%q): %v", filter, err)
 			}
 		})
+	}
+}
+
+func TestParseFilterStringMatchOperatorMatrix(t *testing.T) {
+	t.Parallel()
+
+	resource := newDynamicFilterResource(t)
+	accepted := []string{
+		`display_name = "foo*"`,
+		`display_name != "*foo"`,
+		`display_name < "foo\\*"`,
+		`tags:"foo\\*"`,
+	}
+	for _, filter := range accepted {
+		t.Run("accept "+filter, func(t *testing.T) {
+			t.Parallel()
+			if _, err := parseFilter(filter, resource, 0); err != nil {
+				t.Fatalf("parseFilter(%q): %v", filter, err)
+			}
+		})
+	}
+
+	rejected := []struct {
+		filter string
+		want   string
+	}{
+		{`display_name < "foo*"`, "only supports = and !="},
+		{`tags:"foo*"`, "requires an exact string"},
+		{`count = "*"`, "type check"},
+	}
+	for _, test := range rejected {
+		t.Run("reject "+test.filter, func(t *testing.T) {
+			t.Parallel()
+			_, err := parseFilter(test.filter, resource, 0)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("parseFilter(%q) error = %v, want substring %q", test.filter, err, test.want)
+			}
+		})
+	}
+}
+
+func TestFilterValueUsesSeparateStringAndEnumAccessors(t *testing.T) {
+	t.Parallel()
+
+	resource := newDynamicFilterResource(t)
+	stringFilter, err := parseFilter(`display_name = "foo"`, resource, 0)
+	if err != nil {
+		t.Fatalf("parse string filter: %v", err)
+	}
+	if _, ok := stringFilter.Root().Value().EnumSymbol(); ok {
+		t.Fatal("string literal reported an enum symbol")
+	}
+
+	enumFilter, err := parseFilter(`roles:ACTIVE`, resource, 0)
+	if err != nil {
+		t.Fatalf("parse enum filter: %v", err)
+	}
+	if got, ok := enumFilter.Root().Value().EnumSymbol(); !ok || got != "ACTIVE" {
+		t.Fatalf("EnumSymbol() = (%q, %v), want (ACTIVE, true)", got, ok)
+	}
+	if _, ok := enumFilter.Root().Value().StringMatch(); ok {
+		t.Fatal("enum literal reported a string match")
+	}
+}
+
+func TestParseFilterPreservesNULInStringMatch(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := parseFilter(`display_name = "\u0000"`, newDynamicFilterResource(t), 0)
+	if err != nil {
+		t.Fatalf("parseFilter: %v", err)
+	}
+	match, ok := parsed.Root().Value().StringMatch()
+	if !ok || match.Kind() != StringMatchExact || match.Literal() != "\x00" {
+		t.Fatalf("StringMatch() = (%v, %v), want Exact NUL", match, ok)
 	}
 }
 

@@ -45,6 +45,10 @@ func TestSQLiteLiveContract(t *testing.T) {
 		rows := resetContractRows(t, client)
 		testFullListContract(t, client, fields, rows)
 	})
+	t.Run("wildcard string match", func(t *testing.T) {
+		resetContractRows(t, client)
+		testWildcardStringMatches(t, client, fields)
+	})
 	t.Run("nullable keyset", func(t *testing.T) {
 		resetContractRows(t, client)
 		testNullableKeyset(t, client, fields)
@@ -83,6 +87,10 @@ func TestPostgresLiveContract(t *testing.T) {
 		resetContractRows(t, client)
 		testBinaryCollation(t, client, fields)
 		testNullableKeyset(t, client, fields)
+	})
+	t.Run("wildcard string match", func(t *testing.T) {
+		resetContractRows(t, client)
+		testWildcardStringMatches(t, client, fields)
 	})
 	t.Run("numeric storage and time cursors", func(t *testing.T) {
 		rows := resetContractRows(t, client)
@@ -172,6 +180,7 @@ func resetContractRows(t *testing.T, client *entfixture.Client) []*entfixture.Co
 			SetID(item.id).
 			SetTextValue(item.textValue).
 			SetUniqueText(item.uniqueText).
+			SetProfile(map[string]any{"contact": map[string]any{"email": item.textValue}}).
 			SetNumericValue(item.numericValue).
 			SetEnumNumber(item.enumNumber).
 			SetNillableNullableText(item.nullableText).
@@ -192,8 +201,8 @@ func liveListFields(t *testing.T) *crud.ListFields[*entfixture.ContractRow] {
 	fields, err := crud.NewListFields[*entfixture.ContractRow](
 		crud.Columns(entrow.ValidColumn),
 		crud.Bind(examplev1.UserFields.DisplayName, entrow.FieldTextValue).Filter().Order(),
-		crud.Bind(examplev1.UserFields.Email, entrow.FieldUniqueText).Filter(),
-		crud.Bind(examplev1.UserFields.TenantPlan, entrow.FieldNumericValue).Filter().WithQueryConverter(planNumber),
+		crud.JSONPath(examplev1.UserFields.Email, entrow.FieldProfile, "contact", "email").Filter().Nullable(),
+		crud.Custom(examplev1.UserFields.TenantPlan, entrow.FieldNumericValue, planPredicate).Filter(),
 		crud.Bind(examplev1.UserFields.Nickname, entrow.FieldNullableText).Filter().Order().Nullable(),
 		crud.Bind(examplev1.UserFields.CreateTime, entrow.FieldTimestampValue).Filter().Order(),
 		crud.Bind(examplev1.UserFields.UpdateTime, entrow.FieldUpdatedTimestamp).Filter().Order(),
@@ -207,16 +216,27 @@ func liveListFields(t *testing.T) *crud.ListFields[*entfixture.ContractRow] {
 	return fields
 }
 
-func planNumber(value corecrud.FilterValue) (any, error) {
-	plan, ok := value.StringValue()
-	if !ok {
-		return nil, fmt.Errorf("tenant_plan is not a string literal")
+func planPredicate(
+	operator corecrud.FilterOperator,
+	value corecrud.FilterValue,
+) (crud.SelectorPredicate, error) {
+	match, ok := value.StringMatch()
+	if !ok || match.Kind() != corecrud.StringMatchExact {
+		return nil, fmt.Errorf("tenant_plan requires an exact string match")
 	}
-	number, ok := map[string]int32{"free": 1, "team": 2, "business": 3, "enterprise": 4}[plan]
+	number, ok := map[string]int32{"free": 1, "team": 2, "business": 3, "enterprise": 4}[match.Literal()]
 	if !ok {
-		return nil, fmt.Errorf("unknown tenant_plan %q", plan)
+		return nil, fmt.Errorf("unknown tenant_plan %q", match.Literal())
 	}
-	return number, nil
+	if operator != corecrud.FilterOperatorEqual && operator != corecrud.FilterOperatorNotEqual {
+		return nil, fmt.Errorf("tenant_plan does not support operator %q", operator)
+	}
+	return func(selector *entsql.Selector) *entsql.Predicate {
+		if operator == corecrud.FilterOperatorEqual {
+			return entsql.EQ(selector.C(entrow.FieldNumericValue), number)
+		}
+		return entsql.NEQ(selector.C(entrow.FieldNumericValue), number)
+	}, nil
 }
 
 func prepareLiveQuery(t *testing.T, input corecrud.ListInput) corecrud.ListQuery {
@@ -250,7 +270,7 @@ func testFullListContract(t *testing.T, client *entfixture.Client, fields *crud.
 	t.Helper()
 	scope := []byte("tenant:acme")
 	filtered := listLive(t, client, fields, corecrud.ListInput{
-		Collection: "tenants/acme/users", Filter: `email = "b@example.com"`, IncludeTotal: true,
+		Collection: "tenants/acme/users", Filter: `display_name = "Alpha"`, IncludeTotal: true,
 	}, scope)
 	if got := ids(filtered.Items()); !slices.Equal(got, []uint32{20}) {
 		t.Fatalf("filtered IDs = %v, want [20]", got)
@@ -313,6 +333,116 @@ func testBinaryCollation(t *testing.T, client *entfixture.Client, fields *crud.L
 	}, nil)
 	if got := displayNames(result.Items()); !slices.Equal(got, []string{"Alpha", "Bravo", "beta"}) {
 		t.Fatalf("binary collation names = %v, want [Alpha Bravo beta]", got)
+	}
+}
+
+func testWildcardStringMatches(
+	t *testing.T,
+	client *entfixture.Client,
+	fields *crud.ListFields[*entfixture.ContractRow],
+) {
+	t.Helper()
+	ctx := entgomixin.SkipSoftDelete(context.Background())
+	extras := []struct {
+		id      uint32
+		text    string
+		profile map[string]any
+	}{
+		{id: 50, text: "CaseTail", profile: map[string]any{"contact": map[string]any{"email": "CaseTail"}}},
+		{id: 60, text: "casetail", profile: map[string]any{"contact": map[string]any{"email": "casetail"}}},
+		{id: 70, text: "café", profile: map[string]any{"contact": map[string]any{"email": "café"}}},
+		{id: 80, text: "cafe", profile: map[string]any{"contact": map[string]any{"email": "cafe"}}},
+		{id: 90, text: "", profile: map[string]any{"contact": map[string]any{"email": ""}}},
+		{id: 100, text: "literal*", profile: map[string]any{"contact": map[string]any{"email": "literal*"}}},
+		{id: 110, text: "missing", profile: map[string]any{}},
+		{id: 120, text: "json-null", profile: map[string]any{"contact": map[string]any{"email": nil}}},
+		{id: 130, text: "string-null", profile: map[string]any{"contact": map[string]any{"email": "null"}}},
+	}
+	for _, extra := range extras {
+		if _, err := client.ContractRow.Create().
+			SetID(extra.id).
+			SetTextValue(extra.text).
+			SetUniqueText(fmt.Sprintf("wildcard-%d@example.com", extra.id)).
+			SetProfile(extra.profile).
+			SetNumericValue(int32(extra.id)).
+			Save(ctx); err != nil {
+			t.Fatalf("seed wildcard row %d: %v", extra.id, err)
+		}
+	}
+
+	patterns := []struct {
+		name  string
+		value string
+		want  []uint32
+	}{
+		{name: "prefix is case-sensitive", value: `"Case*"`, want: []uint32{50}},
+		{name: "suffix is case-sensitive", value: `"*Tail"`, want: []uint32{50}},
+		{name: "contains is case-sensitive", value: `"*aseT*"`, want: []uint32{50}},
+		{name: "accent is significant", value: `"*é*"`, want: []uint32{70}},
+		{name: "literal star", value: `"literal\\*"`, want: []uint32{100}},
+		{name: "empty exact", value: `""`, want: []uint32{90}},
+	}
+	for _, test := range patterns {
+		t.Run(test.name, func(t *testing.T) {
+			column := listLive(t, client, fields, corecrud.ListInput{
+				Collection: "tenants/acme/users", Filter: "display_name = " + test.value,
+			}, nil)
+			jsonPath := listLive(t, client, fields, corecrud.ListInput{
+				Collection: "tenants/acme/users", Filter: "email = " + test.value,
+			}, nil)
+			if got := ids(column.Items()); !slices.Equal(got, test.want) {
+				t.Fatalf("column IDs = %v, want %v", got, test.want)
+			}
+			if got := ids(jsonPath.Items()); !slices.Equal(got, test.want) {
+				t.Fatalf("JSONPath IDs = %v, want %v", got, test.want)
+			}
+		})
+	}
+
+	columnAll := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `display_name = "*"`, IncludeTotal: true,
+	}, nil)
+	if total, present := columnAll.TotalSize(); !present || total != 13 {
+		t.Fatalf("column match-all total = (%d, %v), want (13, true)", total, present)
+	}
+	jsonAll := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `email = "*"`, IncludeTotal: true,
+	}, nil)
+	if total, present := jsonAll.TotalSize(); !present || total != 11 {
+		t.Fatalf("JSONPath match-all total = (%d, %v), want (11, true)", total, present)
+	}
+
+	jsonNotAll := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `email != "*"`, IncludeTotal: true,
+	}, nil)
+	if total, present := jsonNotAll.TotalSize(); !present || total != 0 {
+		t.Fatalf("JSONPath negated match-all total = (%d, %v), want (0, true)", total, present)
+	}
+	jsonNull := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `email = null`,
+	}, nil)
+	jsonNullIDs := ids(jsonNull.Items())
+	slices.Sort(jsonNullIDs)
+	if !slices.Equal(jsonNullIDs, []uint32{110, 120}) {
+		t.Fatalf("JSONPath NULL IDs = %v, want [110 120]", jsonNullIDs)
+	}
+	jsonNotNull := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `email != null`, IncludeTotal: true,
+	}, nil)
+	if total, present := jsonNotNull.TotalSize(); !present || total != 11 {
+		t.Fatalf("JSONPath non-NULL total = (%d, %v), want (11, true)", total, present)
+	}
+	jsonStringNull := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `email = "null"`,
+	}, nil)
+	if got := ids(jsonStringNull.Items()); !slices.Equal(got, []uint32{130}) {
+		t.Fatalf("JSONPath string-null IDs = %v, want [130]", got)
+	}
+	jsonNotPrefix := listLive(t, client, fields, corecrud.ListInput{
+		Collection: "tenants/acme/users", Filter: `email != "Case*"`, IncludeTotal: true,
+	}, nil)
+	if total, present := jsonNotPrefix.TotalSize(); !present || total != 10 {
+		t.Fatalf("JSONPath negated prefix total = (%d, %v), want (10, true)", total, present)
 	}
 }
 
@@ -507,12 +637,12 @@ func executeInvalidColumnList(t *testing.T, client *entfixture.Client) error {
 		crud.Bind(examplev1.UserFields.CreateTime, entrow.FieldTimestampValue).Order(),
 		crud.DefaultOrder(examplev1.UserFields.CreateTime, corecrud.OrderAscending),
 		crud.Custom(examplev1.UserFields.Email, "broken_email", func(_ corecrud.FilterOperator, value corecrud.FilterValue) (crud.SelectorPredicate, error) {
-			raw, ok := value.StringValue()
-			if !ok {
-				return nil, fmt.Errorf("email literal is not a string")
+			match, ok := value.StringMatch()
+			if !ok || match.Kind() != corecrud.StringMatchExact {
+				return nil, fmt.Errorf("email requires an exact string match")
 			}
 			return func(selector *entsql.Selector) *entsql.Predicate {
-				return entsql.EQ(selector.C("missing_live_contract_column"), raw)
+				return entsql.EQ(selector.C("missing_live_contract_column"), match.Literal())
 			}, nil
 		}).Filter(),
 		crud.CursorKey[uint32](entrow.FieldID, corecrud.OrderAscending),

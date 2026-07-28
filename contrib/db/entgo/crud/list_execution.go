@@ -316,7 +316,7 @@ func (fields *ListFields[PO]) writeBinaryOrderExpression(
 	source fieldBinding,
 ) {
 	if source.customOrder == nil {
-		writeBinaryStringExpression(builder, selector.C(source.column))
+		writeBinaryStringExpression(builder, columnStringExpression(selector.C(source.column)))
 		return
 	}
 	switch builder.Dialect() {

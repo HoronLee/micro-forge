@@ -10,13 +10,12 @@ export type FieldCollection =
   | readonly string[]
   | Readonly<Record<string, string>>;
 
-export type FieldOf<Fields extends FieldCollection> = Fields extends readonly (
-  infer Field extends string
-)[]
-  ? Field
-  : Fields extends Readonly<Record<string, infer Field extends string>>
+export type FieldOf<Fields extends FieldCollection> =
+  Fields extends readonly (infer Field extends string)[]
     ? Field
-    : never;
+    : Fields extends Readonly<Record<string, infer Field extends string>>
+      ? Field
+      : never;
 
 export type FieldKeyOf<Fields extends FieldCollection> =
   Fields extends readonly (infer Field extends string)[]
@@ -25,7 +24,9 @@ export type FieldKeyOf<Fields extends FieldCollection> =
       ? Key
       : never;
 
-function fieldEntries(fields: FieldCollection): ReadonlyArray<readonly [string, string]> {
+function fieldEntries(
+  fields: FieldCollection,
+): ReadonlyArray<readonly [string, string]> {
   return Array.isArray(fields)
     ? fields.map((field) => [field, field] as const)
     : Object.entries(fields as Readonly<Record<string, string>>);
@@ -63,6 +64,16 @@ export function makeUpdateMask<
 
 export type FilterOperator = "=" | "!=" | "<" | "<=" | ">" | ">=" | ":";
 
+const filterOperators: Record<FilterOperator, true> = {
+  "=": true,
+  "!=": true,
+  "<": true,
+  "<=": true,
+  ">": true,
+  ">=": true,
+  ":": true,
+};
+
 const rawFilterValueSymbol: unique symbol = Symbol("RawFilterValue");
 
 export type RawFilterValue = Readonly<{
@@ -78,6 +89,42 @@ export function rawFilterValue(text: string): RawFilterValue {
   return Object.freeze({ [rawFilterValueSymbol]: true as const, text });
 }
 
+const stringMatchValueSymbol: unique symbol = Symbol("StringMatchValue");
+
+export type StringMatchValueKind = "prefix" | "suffix" | "contains";
+
+export type StringMatchValue = Readonly<{
+  [stringMatchValueSymbol]: true;
+  kind: StringMatchValueKind;
+  value: string;
+}>;
+
+function stringMatchValue(
+  kind: StringMatchValueKind,
+  value: string,
+): StringMatchValue {
+  return Object.freeze({
+    [stringMatchValueSymbol]: true as const,
+    kind,
+    value,
+  });
+}
+
+/** Builds a typed string prefix filter value. */
+export function filterPrefix(value: string): StringMatchValue {
+  return stringMatchValue("prefix", value);
+}
+
+/** Builds a typed string suffix filter value. */
+export function filterSuffix(value: string): StringMatchValue {
+  return stringMatchValue("suffix", value);
+}
+
+/** Builds a typed string contains filter value. */
+export function filterContains(value: string): StringMatchValue {
+  return stringMatchValue("contains", value);
+}
+
 export type FilterValue =
   | string
   | number
@@ -85,7 +132,8 @@ export type FilterValue =
   | boolean
   | Date
   | null
-  | RawFilterValue;
+  | RawFilterValue
+  | StringMatchValue;
 
 export type FilterExpression<Field extends string> =
   | Readonly<{
@@ -113,14 +161,37 @@ function renderFilter(
     if (!fields.has(expression.field)) {
       throw new RangeError(`unknown filter field: ${expression.field}`);
     }
-    if (expression.value === null && !["=", "!="].includes(expression.operator)) {
+    if (
+      !Object.prototype.hasOwnProperty.call(
+        filterOperators,
+        expression.operator,
+      )
+    ) {
+      throw new RangeError(
+        `unsupported filter operator: ${String(expression.operator)}`,
+      );
+    }
+    if (
+      expression.value === null &&
+      !["=", "!="].includes(expression.operator)
+    ) {
       throw new RangeError("null filter values only support = and !=");
+    }
+    if (
+      isStringMatchValue(expression.value) &&
+      expression.operator !== "=" &&
+      expression.operator !== "!="
+    ) {
+      throw new RangeError(
+        "typed wildcard filter values only support = and !=",
+      );
     }
     return `${expression.field} ${expression.operator} ${renderFilterValue(expression.value)}`;
   }
-  const [operator, children] = "and" in expression
-    ? (["AND", expression.and] as const)
-    : (["OR", expression.or] as const);
+  const [operator, children] =
+    "and" in expression
+      ? (["AND", expression.and] as const)
+      : (["OR", expression.or] as const);
   if (children.length === 0) {
     throw new RangeError(`${operator} filter group must not be empty`);
   }
@@ -129,7 +200,9 @@ function renderFilter(
 
 function renderFilterValue(value: FilterValue): string {
   if (value === null) return "null";
-  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "string") {
+    return JSON.stringify(escapeWildcardLiteral(value));
+  }
   if (typeof value === "boolean" || typeof value === "bigint") {
     return value.toString();
   }
@@ -145,7 +218,35 @@ function renderFilterValue(value: FilterValue): string {
     }
     return `timestamp(${JSON.stringify(value.toISOString())})`;
   }
+  if (isStringMatchValue(value)) {
+    return renderStringMatchValue(value);
+  }
   return value.text;
+}
+
+function isStringMatchValue(value: FilterValue): value is StringMatchValue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    stringMatchValueSymbol in value
+  );
+}
+
+function escapeWildcardLiteral(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("*", "\\*");
+}
+
+function renderStringMatchValue(value: StringMatchValue): string {
+  if (value.value.length === 0) return JSON.stringify("*");
+  const literal = escapeWildcardLiteral(value.value);
+  switch (value.kind) {
+    case "prefix":
+      return JSON.stringify(`${literal}*`);
+    case "suffix":
+      return JSON.stringify(`*${literal}`);
+    case "contains":
+      return JSON.stringify(`*${literal}*`);
+  }
 }
 
 export type OrderDirection = "asc" | "desc";

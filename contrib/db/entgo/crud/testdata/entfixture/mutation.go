@@ -39,6 +39,7 @@ type ContractRowMutation struct {
 	purge_time        *time.Time
 	text_value        *string
 	unique_text       *string
+	profile           *map[string]interface{}
 	numeric_value     *int32
 	addnumeric_value  *int32
 	nullable_text     *string
@@ -377,6 +378,42 @@ func (m *ContractRowMutation) ResetUniqueText() {
 	m.unique_text = nil
 }
 
+// SetProfile sets the "profile" field.
+func (m *ContractRowMutation) SetProfile(value map[string]interface{}) {
+	m.profile = &value
+}
+
+// Profile returns the value of the "profile" field in the mutation.
+func (m *ContractRowMutation) Profile() (r map[string]interface{}, exists bool) {
+	v := m.profile
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProfile returns the old "profile" field's value of the ContractRow entity.
+// If the ContractRow object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContractRowMutation) OldProfile(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProfile is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProfile requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProfile: %w", err)
+	}
+	return oldValue.Profile, nil
+}
+
+// ResetProfile resets all changes to the "profile" field.
+func (m *ContractRowMutation) ResetProfile() {
+	m.profile = nil
+}
+
 // SetNumericValue sets the "numeric_value" field.
 func (m *ContractRowMutation) SetNumericValue(i int32) {
 	m.numeric_value = &i
@@ -700,7 +737,7 @@ func (m *ContractRowMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContractRowMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.delete_time != nil {
 		fields = append(fields, contractrow.FieldDeleteTime)
 	}
@@ -715,6 +752,9 @@ func (m *ContractRowMutation) Fields() []string {
 	}
 	if m.unique_text != nil {
 		fields = append(fields, contractrow.FieldUniqueText)
+	}
+	if m.profile != nil {
+		fields = append(fields, contractrow.FieldProfile)
 	}
 	if m.numeric_value != nil {
 		fields = append(fields, contractrow.FieldNumericValue)
@@ -752,6 +792,8 @@ func (m *ContractRowMutation) Field(name string) (ent.Value, bool) {
 		return m.TextValue()
 	case contractrow.FieldUniqueText:
 		return m.UniqueText()
+	case contractrow.FieldProfile:
+		return m.Profile()
 	case contractrow.FieldNumericValue:
 		return m.NumericValue()
 	case contractrow.FieldNullableText:
@@ -783,6 +825,8 @@ func (m *ContractRowMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldTextValue(ctx)
 	case contractrow.FieldUniqueText:
 		return m.OldUniqueText(ctx)
+	case contractrow.FieldProfile:
+		return m.OldProfile(ctx)
 	case contractrow.FieldNumericValue:
 		return m.OldNumericValue(ctx)
 	case contractrow.FieldNullableText:
@@ -838,6 +882,13 @@ func (m *ContractRowMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUniqueText(v)
+		return nil
+	case contractrow.FieldProfile:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProfile(v)
 		return nil
 	case contractrow.FieldNumericValue:
 		v, ok := value.(int32)
@@ -1010,6 +1061,9 @@ func (m *ContractRowMutation) ResetField(name string) error {
 		return nil
 	case contractrow.FieldUniqueText:
 		m.ResetUniqueText()
+		return nil
+	case contractrow.FieldProfile:
+		m.ResetProfile()
 		return nil
 	case contractrow.FieldNumericValue:
 		m.ResetNumericValue()

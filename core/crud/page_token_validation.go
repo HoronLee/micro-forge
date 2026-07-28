@@ -13,7 +13,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const contextFingerprintDomain = "servora.crud.query-context.v1"
+const (
+	contextFingerprintDomain = "servora.crud.query-context.v1"
+	filterProfileID          = "servora.crud.filter.v1"
+)
 
 // ContextFingerprintInput contains the complete canonical List context.
 // IncludeTotal is intentionally absent because Count does not affect membership or ordering.
@@ -29,6 +32,7 @@ type ContextFingerprintInput struct {
 func ComputeContextFingerprint(input ContextFingerprintInput) [sha256.Size]byte {
 	hasher := sha256.New()
 	writeFingerprintPart(hasher, []byte(contextFingerprintDomain))
+	writeFingerprintPart(hasher, []byte(filterProfileID))
 	writeFingerprintPart(hasher, []byte(input.ResourceType))
 	writeFingerprintPart(hasher, []byte(input.Collection))
 	writeFingerprintPart(hasher, []byte(input.Filter.String()))

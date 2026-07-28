@@ -1,11 +1,14 @@
 package crud_test
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"math"
 	"testing"
 	"time"
 
 	crudpb "github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1"
+	examplev1 "github.com/Servora-Kit/servora/api/gen/go/servora/example/v1"
 	"github.com/Servora-Kit/servora/core/crud"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -257,4 +260,96 @@ func pageTokenPayload(fingerprint [32]byte, cursor ...*crudpb.CursorValue) *crud
 		ContextFingerprint: append([]byte(nil), fingerprint[:]...),
 		Cursor:             cursor,
 	}
+}
+
+func TestComputeContextFingerprintAlwaysIncludesFilterProfile(t *testing.T) {
+	t.Parallel()
+
+	preparer, err := crud.NewListPreparer()
+	if err != nil {
+		t.Fatalf("NewListPreparer: %v", err)
+	}
+	plan := crud.MustBuildResourcePlan[*examplev1.User](examplev1.UserCRUDDescriptor())
+	filters := []struct {
+		name   string
+		filter string
+	}{
+		{name: "empty"},
+		{name: "exact", filter: `display_name = "foo"`},
+		{name: "wildcard", filter: `display_name = "*foo*"`},
+	}
+	for _, test := range filters {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			query, err := preparer.PrepareList(plan, crud.ListInput{Filter: test.filter})
+			if err != nil {
+				t.Fatalf("PrepareList: %v", err)
+			}
+			input := crud.ContextFingerprintInput{
+				ResourceType:     "test.dev/Resource",
+				Collection:       "tenants/acme/users",
+				Filter:           query.Filter(),
+				ScopeFingerprint: []byte("scope"),
+			}
+			if got, legacy := crud.ComputeContextFingerprint(input), legacyContextFingerprint(input); got == legacy {
+				t.Fatal("fingerprint matches the pre-filter-profile format")
+			}
+		})
+	}
+}
+
+func TestFilterProfileInvalidatesPreUpgradeToken(t *testing.T) {
+	t.Parallel()
+
+	input := crud.ContextFingerprintInput{ResourceType: "test.dev/Resource"}
+	current := crud.ComputeContextFingerprint(input)
+	legacy := legacyContextFingerprint(input)
+	payload := pageTokenPayload(legacy)
+	if _, err := crud.ValidatePageTokenPayload(payload, current, crud.FinalOrder{}); !crudpb.IsCrudErrorReasonInvalidPageToken(err) {
+		t.Fatalf("ValidatePageTokenPayload error = %v, want INVALID_PAGE_TOKEN", err)
+	}
+}
+
+func TestEquivalentWildcardFiltersShareFingerprint(t *testing.T) {
+	t.Parallel()
+
+	preparer, err := crud.NewListPreparer()
+	if err != nil {
+		t.Fatalf("NewListPreparer: %v", err)
+	}
+	plan := crud.MustBuildResourcePlan[*examplev1.User](examplev1.UserCRUDDescriptor())
+	first, err := preparer.PrepareList(plan, crud.ListInput{Filter: `display_name = "**foo**"`})
+	if err != nil {
+		t.Fatalf("PrepareList(first): %v", err)
+	}
+	second, err := preparer.PrepareList(plan, crud.ListInput{Filter: `display_name = "*foo*"`})
+	if err != nil {
+		t.Fatalf("PrepareList(second): %v", err)
+	}
+	firstFingerprint := crud.ComputeContextFingerprint(crud.ContextFingerprintInput{ResourceType: "test.dev/Resource", Filter: first.Filter()})
+	secondFingerprint := crud.ComputeContextFingerprint(crud.ContextFingerprintInput{ResourceType: "test.dev/Resource", Filter: second.Filter()})
+	if firstFingerprint != secondFingerprint {
+		t.Fatal("equivalent wildcard filters produced distinct fingerprints")
+	}
+}
+
+func legacyContextFingerprint(input crud.ContextFingerprintInput) [sha256.Size]byte {
+	hasher := sha256.New()
+	writeLegacyFingerprintPart(hasher, []byte("servora.crud.query-context.v1"))
+	writeLegacyFingerprintPart(hasher, []byte(input.ResourceType))
+	writeLegacyFingerprintPart(hasher, []byte(input.Collection))
+	writeLegacyFingerprintPart(hasher, []byte(input.Filter.String()))
+	var orderCount [8]byte
+	writeLegacyFingerprintPart(hasher, orderCount[:])
+	writeLegacyFingerprintPart(hasher, input.ScopeFingerprint)
+	var result [sha256.Size]byte
+	copy(result[:], hasher.Sum(nil))
+	return result
+}
+
+func writeLegacyFingerprintPart(hasher interface{ Write([]byte) (int, error) }, value []byte) {
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+	_, _ = hasher.Write(length[:])
+	_, _ = hasher.Write(value)
 }

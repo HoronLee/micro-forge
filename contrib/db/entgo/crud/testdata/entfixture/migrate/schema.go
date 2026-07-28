@@ -16,6 +16,7 @@ var (
 		{Name: "purge_time", Type: field.TypeTime, Nullable: true},
 		{Name: "text_value", Type: field.TypeString, Default: ""},
 		{Name: "unique_text", Type: field.TypeString},
+		{Name: "profile", Type: field.TypeJSON},
 		{Name: "numeric_value", Type: field.TypeInt32},
 		{Name: "nullable_text", Type: field.TypeString, Nullable: true},
 		{Name: "timestamp_value", Type: field.TypeTime},

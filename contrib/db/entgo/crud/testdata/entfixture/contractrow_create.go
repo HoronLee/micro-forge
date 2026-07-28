@@ -83,6 +83,12 @@ func (_c *ContractRowCreate) SetUniqueText(v string) *ContractRowCreate {
 	return _c
 }
 
+// SetProfile sets the "profile" field.
+func (_c *ContractRowCreate) SetProfile(v map[string]interface{}) *ContractRowCreate {
+	_c.mutation.SetProfile(v)
+	return _c
+}
+
 // SetNumericValue sets the "numeric_value" field.
 func (_c *ContractRowCreate) SetNumericValue(v int32) *ContractRowCreate {
 	_c.mutation.SetNumericValue(v)
@@ -239,6 +245,9 @@ func (_c *ContractRowCreate) check() error {
 	if _, ok := _c.mutation.UniqueText(); !ok {
 		return &ValidationError{Name: "unique_text", err: errors.New(`entfixture: missing required field "ContractRow.unique_text"`)}
 	}
+	if _, ok := _c.mutation.Profile(); !ok {
+		return &ValidationError{Name: "profile", err: errors.New(`entfixture: missing required field "ContractRow.profile"`)}
+	}
 	if _, ok := _c.mutation.NumericValue(); !ok {
 		return &ValidationError{Name: "numeric_value", err: errors.New(`entfixture: missing required field "ContractRow.numeric_value"`)}
 	}
@@ -305,6 +314,10 @@ func (_c *ContractRowCreate) createSpec() (*ContractRow, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UniqueText(); ok {
 		_spec.SetField(contractrow.FieldUniqueText, field.TypeString, value)
 		_node.UniqueText = value
+	}
+	if value, ok := _c.mutation.Profile(); ok {
+		_spec.SetField(contractrow.FieldProfile, field.TypeJSON, value)
+		_node.Profile = value
 	}
 	if value, ok := _c.mutation.NumericValue(); ok {
 		_spec.SetField(contractrow.FieldNumericValue, field.TypeInt32, value)

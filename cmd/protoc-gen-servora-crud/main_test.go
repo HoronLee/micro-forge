@@ -44,7 +44,7 @@ func TestGenerateGoCompanionForValidResource(t *testing.T) {
 			t.Fatalf("generated Go missing %q:\n%s", expected, content)
 		}
 	}
-	for _, forbidden := range []string{"core/crud", "MethodPlan", "UpdateUserCommand", "ToPO"} {
+	for _, forbidden := range []string{"core/crud", "MethodPlan", "UpdateUserCommand", "ToPO", "StringMatch", "FilterPrefix", "FilterSuffix", "FilterContains", "LogicalType"} {
 		if strings.Contains(content, forbidden) {
 			t.Fatalf("generated Go contains forbidden %q", forbidden)
 		}
@@ -67,7 +67,7 @@ func TestGenerateTypeScriptCompanionIsLightweight(t *testing.T) {
 			t.Fatalf("generated TypeScript missing %q:\n%s", expected, content)
 		}
 	}
-	for _, forbidden := range []string{"class UserService", "interface User", "fetch(", "axios"} {
+	for _, forbidden := range []string{"class UserService", "interface User", "fetch(", "axios", "StringMatch", "filterPrefix", "filterSuffix", "filterContains", "logicalType", "logical_type"} {
 		if strings.Contains(content, forbidden) {
 			t.Fatalf("generated TypeScript contains transport/type output %q", forbidden)
 		}

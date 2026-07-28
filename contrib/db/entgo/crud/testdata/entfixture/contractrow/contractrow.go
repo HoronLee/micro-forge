@@ -25,6 +25,8 @@ const (
 	FieldTextValue = "text_value"
 	// FieldUniqueText holds the string denoting the unique_text field in the database.
 	FieldUniqueText = "unique_text"
+	// FieldProfile holds the string denoting the profile field in the database.
+	FieldProfile = "profile"
 	// FieldNumericValue holds the string denoting the numeric_value field in the database.
 	FieldNumericValue = "numeric_value"
 	// FieldNullableText holds the string denoting the nullable_text field in the database.
@@ -49,6 +51,7 @@ var Columns = []string{
 	FieldPurgeTime,
 	FieldTextValue,
 	FieldUniqueText,
+	FieldProfile,
 	FieldNumericValue,
 	FieldNullableText,
 	FieldTimestampValue,
