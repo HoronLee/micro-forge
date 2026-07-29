@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://pkg.go.dev/github.com/Servora-Kit/servora"><img src="https://pkg.go.dev/badge/github.com/Servora-Kit/servora.svg" alt="Go Reference" /></a>
   <a href="https://github.com/Servora-Kit/servora/releases"><img src="https://img.shields.io/github/v/release/Servora-Kit/servora" alt="GitHub release" /></a>
-  <a href="https://goreportcard.com/report/github.com/Servora-Kit/servora"><img src="https://goreportcard.com/badge/github.com/Servora-Kit/servora" alt="Go Report Card" /></a>
+  <a href="https://github.com/Servora-Kit/servora/actions/workflows/ci.yml"><img src="https://github.com/Servora-Kit/servora/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/Servora-Kit/servora" alt="License" /></a>
   <a href="https://deepwiki.com/Servora-Kit/servora"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" /></a>
 </p>
