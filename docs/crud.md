@@ -576,7 +576,7 @@ const updateMask = makeUpdateMask(UserUpdateFields, {
 
 普通 TypeScript string 永远表示 Exact；其中的 `*` 与 `\` 会先做 wildcard 层转义，再做 quoted-string 编码。Prefix/Suffix/Contains 必须使用对应 typed helper；helper 与 `<`、`<=`、`>`、`>=`、`:` 组合时 `buildFilter` 会本地抛出 `RangeError`。三个 helper 都接受空字符串并统一输出 `"*"`。`rawFilterValue` 是有意绕过 typed helper 的原样出口，不重复实现服务端 parser；调用方负责 raw text 的语法意图，服务端仍执行权威字段类型和 operator 校验。
 
-生成的 HTTP client 通过 `createRequestHandler` 接入 transport。ProtoJSON response 可显式使用 `responseType: "json"`；Kratos 错误由 `ApiError` 保留响应体供业务解析。
+生成的 HTTP client 只依赖其生成的 `ClientTransport` interface；下游应用在 composition root 中用 native fetch、Next.js fetch、Nuxt `$fetch`、ofetch 或 Axios 实现 adapter。HTTP unary adapter 必须发送 `Accept: application/json`，仅在生成 body 非空时发送 `Content-Type: application/json`，并原样发送已生成的 ProtoJSON body。`@servora/proto-utils/errors` 只提供框架中立的 `ApiError` 与 Kratos body parser；认证、重试、第三方错误识别和用户文案由应用负责。
 
 ## 后端支持与验证
 

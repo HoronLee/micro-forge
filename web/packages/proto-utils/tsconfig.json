@@ -8,9 +8,8 @@
         "strict": true,
         "skipLibCheck": true,
 		"lib": ["ES2022", "DOM"],
-        "baseUrl": ".",
         "paths": {
-            "@servora/proto-utils/crud": ["src/crud/index.ts"]
+            "@servora/proto-utils/crud": ["./src/crud/index.ts"]
         },
     },
     "include": ["src/**/*.ts"]

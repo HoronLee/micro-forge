@@ -10,7 +10,7 @@
 
 | 包 | 路径 | 说明 |
 |---|------|------|
-| `@servora/proto-utils` | `web/packages/proto-utils/` | CRUD/FieldMask/query helper、通用 HTTP client、Token 管理、Kratos 错误解析 |
+| `@servora/proto-utils` | `web/packages/proto-utils/` | CRUD/FieldMask/query helpers、ProtoJSON wire helpers、框架中立错误合同 |
 
 ## 开发约束
 
@@ -26,7 +26,7 @@
 
 ### 与业务仓库的关系
 
-- 业务仓库通过 `@servora/proto-utils` 依赖本包；client 能力通过 `@servora/proto-utils/client` 子路径暴露
+- 业务仓库通过 `@servora/proto-utils` 依赖本包；纯能力通过 `@servora/proto-utils/crud`、`@servora/proto-utils/errors` 与 `@servora/proto-utils/proto/*` 子路径暴露
 - 本地开发：顶层 `pnpm-workspace.yaml`（在 `servora-kit/`）联调，`workspace:*` 自动 link 本地源码
 - CI/生产：通过 npm 公共 registry 安装（`npm publish --provenance`）
 
@@ -58,7 +58,7 @@ servora/
     │   └── proto-utils/      # @servora/proto-utils
     │       ├── src/
     │       │   ├── crud/      # FieldMask、filter/order、pager、ResourceNameError
-    │       │   ├── client/    # HTTP request handler 与 Kratos error helpers
+    │       │   ├── errors.ts   # ApiError 与 Kratos body parser
     │       │   └── gen/       # just gen-ts 生成，禁止手改
     │       ├── dist/         # 构建产物（gitignored，npm publish 时生成）
     │       ├── package.json
@@ -70,12 +70,12 @@ servora/
 
 ## packages/proto-utils 修改约定
 
-- 优先把这里当作 **proto 工具与 client 适配层**，而不是业务逻辑目录
+- 优先把这里当作 **Proto 工具与错误合同目录**，而不是业务 HTTP client 适配层
 - 新增能力前先判断它是否能被多个前端应用复用
 - `packages/proto-utils/src/gen/` 由 `servora/buf.typescript.gen.yaml` 生成，不要手改
 - 错误处理需兼容 Kratos 返回格式：`{ code, reason, message, metadata? }`
-- 修改 Token 刷新、请求头注入、`onError` 触发时机时，必须检查是否影响现有调用方
-- React、Vue、TanStack Query 等框架适配通过 subpath export 隔离，相关依赖必须使用 optional peer dependencies
+- HTTP client、Token、认证、重试和第三方错误识别由各业务仓库的 composition root 负责
+- React、Vue、TanStack Query 等框架适配留在业务应用，不在 proto-utils 增加官方 adapter
 
 ## 禁止事项
 

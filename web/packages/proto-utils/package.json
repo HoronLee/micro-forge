@@ -1,7 +1,7 @@
 {
     "name": "@servora/proto-utils",
-    "version": "0.1.4",
-    "description": "Servora Proto 工具：CRUD 查询、FieldMask、HTTP client、Kratos 错误解析",
+    "version": "0.1.5",
+    "description": "Servora Proto 工具：CRUD 查询、FieldMask、ProtoJSON 与 Kratos 错误解析",
     "type": "module",
     "exports": {
         ".": {
@@ -12,29 +12,13 @@
             "types": "./dist/crud/index.d.ts",
             "import": "./dist/crud/index.js"
         },
-        "./client": {
-            "types": "./dist/client/index.d.ts",
-            "import": "./dist/client/index.js"
-        },
-        "./client/request": {
-            "types": "./dist/client/request.d.ts",
-            "import": "./dist/client/request.js"
-        },
-        "./client/errors": {
-            "types": "./dist/client/errors.d.ts",
-            "import": "./dist/client/errors.js"
-        },
         "./proto/*": {
             "types": "./dist/gen/*/index.d.ts",
             "import": "./dist/gen/*/index.js"
         },
-        "./request": {
-            "types": "./dist/client/request.d.ts",
-            "import": "./dist/client/request.js"
-        },
         "./errors": {
-            "types": "./dist/client/errors.d.ts",
-            "import": "./dist/client/errors.js"
+            "types": "./dist/errors.d.ts",
+            "import": "./dist/errors.js"
         }
     },
     "files": [
@@ -60,9 +44,6 @@
     },
     "license": "MIT",
     "sideEffects": false,
-    "dependencies": {
-        "ofetch": "^1.5.1"
-    },
     "devDependencies": {
         "typescript": "^5.7.2"
     }

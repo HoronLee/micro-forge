@@ -1,38 +1,61 @@
-# Servora Web Packages
+# Servora Web 软件包
 
-Shared frontend libraries for [Servora-Kit](https://github.com/Servora-Kit) web applications.
+供 [Servora-Kit](https://github.com/Servora-Kit) Web 应用共享的前端基础包。
 
-## Packages
+## 包清单
 
-| Package | npm | Description |
-|---------|-----|-------------|
-| [`@servora/proto-utils`](./packages/proto-utils/) | [![npm](https://img.shields.io/npm/v/@servora/proto-utils)](https://www.npmjs.com/package/@servora/proto-utils) | Proto/Kratos API utilities: query builders, FieldMask, HTTP client, Kratos errors |
+| 包 | npm | 说明 |
+|---|---|---|
+| [`@servora/proto-utils`](./packages/proto-utils/) | [![npm](https://img.shields.io/npm/v/@servora/proto-utils)](https://www.npmjs.com/package/@servora/proto-utils) | Proto/Kratos 传输契约工具：CRUD 辅助函数、FieldMask、ProtoJSON 类型与结构化错误 |
 
-## Installation
+## 安装
 
 ```bash
 pnpm add @servora/proto-utils
 ```
 
-## Usage
+## 使用
+
+生成的 HTTP 客户端只依赖其生成的 `ClientTransport` 接口。应用在组合根中使用原生 fetch、Next.js fetch、Nuxt `$fetch`、ofetch、Axios 或其它自有 HTTP 客户端实现该适配器：
 
 ```typescript
-import { createRequestHandler } from '@servora/proto-utils/client/request'
-import { parseKratosError, kratosMessage } from '@servora/proto-utils/client/errors'
-import { firstPage, makeUpdateMask } from '@servora/proto-utils/crud'
+import { createUserHTTPServiceClient } from './generated/example/service/v1'
+import { transport } from './api/transport'
+
+export const userApi = createUserHTTPServiceClient(transport)
 ```
 
-## Local Development
+应用适配器负责基础 URL、认证、超时、重试、响应解码和第三方错误识别。JSON 一元请求必须发送 `Accept: application/json`，仅在生成的请求体非空时增加 `Content-Type: application/json`，并原样发送该 ProtoJSON 请求体，不得再次序列化。
 
-These packages live inside the [`servora`](https://github.com/Servora-Kit/servora) repository. For local development:
+通过明确的子路径导入纯辅助函数与框架中立的错误合同：
+
+```typescript
+import { ApiError, parseKratosError } from '@servora/proto-utils/errors'
+import { firstPage, makeUpdateMask } from '@servora/proto-utils/crud'
+
+try {
+  await userApi.GetUser({ name: 'tenants/demo/users/ada' })
+} catch (error: unknown) {
+  if (error instanceof ApiError) {
+    const body = parseKratosError(error)
+    // 在这里把 body?.reason 映射为应用 i18n 键或本地文案。
+  }
+}
+```
+
+`@servora/proto-utils/errors` 只描述已经发生的错误。它不发送请求、不刷新令牌、不重放 401 请求、不识别 Axios/ofetch 错误，也不决定 Toast 和用户可见文案。
+
+## 本地开发
+
+这些包位于 [`servora`](https://github.com/Servora-Kit/servora) 仓库中。本地开发时执行：
 
 ```bash
-# In the servora-kit workspace root.
+# 在 servora-kit 工作区根目录执行。
 pnpm install
 ```
 
-In the kit workspace, pnpm links the local `servora/web/packages/proto-utils` package. On npm, install `@servora/proto-utils`; the `client`, `query`, and future CRUD/React/Vue helpers are exposed as subpath exports. In the local workspace, `linkWorkspacePackages: true` automatically symlinks to the source, equivalent to Go's `go.work` replace directive.
+kit 工作区中的 pnpm 会链接本地 `servora/web/packages/proto-utils` 包。独立使用时从 npm 安装 `@servora/proto-utils`；纯能力通过 `./crud`、`./errors` 与 `./proto/*` 子路径公开。本地工作区开启 `linkWorkspacePackages: true` 后会自动建立源码符号链接，其作用类似 Go 的 `go.work` replace 指令。
 
-## License
+## 许可证
 
 [MIT](./LICENSE)

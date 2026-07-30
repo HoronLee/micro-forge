@@ -1,0 +1,144 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  ApiError,
+  isKratosReason,
+  parseKratosError,
+  parseKratosErrorBody,
+} from "../dist/errors.js";
+
+const validBody = {
+  code: 404,
+  reason: "USER_ERROR_REASON_NOT_FOUND",
+  message: "user not found",
+};
+
+test("ApiError preserves transport facts and cause", () => {
+  const cause = new TypeError("fetch failed");
+  const error = new ApiError({
+    kind: "http",
+    message: "request failed",
+    httpStatus: 404,
+    responseBody: validBody,
+    service: "UserHTTPService",
+    method: "GetUser",
+    cause,
+  });
+
+  assert(error instanceof Error);
+  assert.equal(error.name, "ApiError");
+  assert.equal(error.kind, "http");
+  assert.equal(error.httpStatus, 404);
+  assert.equal(error.responseBody, validBody);
+  assert.equal(error.service, "UserHTTPService");
+  assert.equal(error.method, "GetUser");
+  assert.equal(error.cause, cause);
+});
+
+test("parseKratosErrorBody accepts the envelope, metadata, and extra fields", () => {
+  assert.deepEqual(parseKratosErrorBody(validBody), validBody);
+
+  const body = {
+    ...validBody,
+    metadata: { tenant: "demo", requestId: "request-1" },
+    futureField: true,
+  };
+  assert.deepEqual(parseKratosErrorBody(body), body);
+});
+
+test("parseKratosErrorBody rejects invalid core fields without coercion", () => {
+  const invalidBodies = [
+    undefined,
+    null,
+    "error",
+    [],
+    { ...validBody, code: "404" },
+    { ...validBody, code: 404.5 },
+    { ...validBody, code: Number.NaN },
+    { ...validBody, code: Number.POSITIVE_INFINITY },
+    { ...validBody, reason: 404 },
+    { ...validBody, message: null },
+  ];
+
+  for (const body of invalidBodies) {
+    assert.equal(parseKratosErrorBody(body), null);
+  }
+});
+
+test("parseKratosErrorBody rejects invalid metadata", () => {
+  const invalidMetadata = [
+    null,
+    undefined,
+    [],
+    { tenant: 1 },
+    { tenant: "demo", requestId: false },
+  ];
+
+  for (const metadata of invalidMetadata) {
+    assert.equal(parseKratosErrorBody({ ...validBody, metadata }), null);
+  }
+});
+
+test("parseKratosErrorBody returns null when unknown property access throws", () => {
+  const body = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("unreadable");
+      },
+    },
+  );
+
+  assert.equal(parseKratosErrorBody(body), null);
+});
+
+test("parseKratosError only maps HTTP errors and matches reasons exactly", () => {
+  const httpError = new ApiError({
+    kind: "http",
+    message: "request failed",
+    httpStatus: 404,
+    responseBody: validBody,
+    service: "UserHTTPService",
+    method: "GetUser",
+  });
+  const networkError = new ApiError({
+    kind: "network",
+    message: "network failed",
+    responseBody: validBody,
+    service: "UserHTTPService",
+    method: "GetUser",
+  });
+
+  assert.deepEqual(parseKratosError(httpError), validBody);
+  assert.equal(parseKratosError(networkError), null);
+  assert.equal(isKratosReason(httpError, "USER_ERROR_REASON_NOT_FOUND"), true);
+  assert.equal(isKratosReason(httpError, "user_error_reason_not_found"), false);
+  assert.equal(isKratosReason(httpError, "NOT_FOUND"), false);
+  assert.equal(isKratosReason(networkError, validBody.reason), false);
+});
+
+test('published errors subpath exposes the public contract', async () => {
+  const published = await import('@servora/proto-utils/errors')
+
+  assert.equal(typeof published.ApiError, 'function')
+  assert.equal(typeof published.parseKratosErrorBody, 'function')
+  assert.equal(typeof published.parseKratosError, 'function')
+  assert.equal(typeof published.isKratosReason, 'function')
+})
+
+test('removed client subpaths are not exported', async () => {
+  const removed = [
+    '@servora/proto-utils/client',
+    '@servora/proto-utils/client/request',
+    '@servora/proto-utils/client/errors',
+    '@servora/proto-utils/request',
+  ]
+
+  for (const specifier of removed) {
+    await assert.rejects(import(specifier), (error) => {
+      assert.equal(error.code, 'ERR_PACKAGE_PATH_NOT_EXPORTED')
+      return true
+    })
+  }
+})

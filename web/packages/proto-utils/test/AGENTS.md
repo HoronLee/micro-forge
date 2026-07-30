@@ -5,7 +5,7 @@
 
 ## 当前定位
 
-`test/` 保存 `@servora/proto-utils` 已构建公开入口的 Node 合同测试，覆盖 CRUD helper 与 HTTP request handler。
+`test/` 保存 `@servora/proto-utils` 已构建公开入口的 Node 合同测试，覆盖 CRUD helper、错误合同和包 exports；不再测试公共 HTTP request handler。
 
 ## 核心约束
 
@@ -19,6 +19,6 @@
 在 `servora/web/packages/proto-utils/` 执行：
 
 ```bash
-pnpm --dir web/packages/proto-utils test
-pnpm --dir web/packages/proto-utils typecheck
+pnpm test
+pnpm typecheck
 ```
