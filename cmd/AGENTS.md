@@ -13,7 +13,7 @@
 |-----------|---------|
 | `svr/` | 统一开发 CLI：`svr new api`、`svr gen gorm`、`svr openfga`（见 `svr/AGENTS.md`） |
 | `protoc-gen-typescript-http/` | 仓库内维护的 TypeScript HTTP client 生成器：遵循 canonical ProtoJSON 的 64 位整数字符串映射，并按 `google.api.http` 单段/多段规则编码路径变量 |
-| `protoc-gen-go-errors/` | 读取 `servora.errors.v1` 注解并生成 Kratos v3 reason constructor；保持上游兼容的 binary 名称 |
+| `protoc-gen-go-errors/` | 读取 `servora.errors.v1` 注解；默认生成 Kratos v3 reason constructor，`target=ts` 生成复用既有联合类型的运行时 reason companion |
 | `protoc-gen-servora-audit/` | 从 `rule`（method）+ `service_default`（service）注解生成审计规则；method 显式字段覆盖 service 默认，未设置字段继承默认 |
 | `protoc-gen-servora-authz/` | 从 `rule`（method）+ `service_default`（service）注解生成授权规则；合并语义同 audit |
 | `protoc-gen-servora-authn/` | 从 `rule`（method）+ `service_default`（service）注解生成 `AuthnRules() map[string]*authnpb.AuthnRule`；合并语义同 audit/authz；空 schemes 表示使用默认认证 engine 集合 |
@@ -25,3 +25,4 @@
 - 修改 proto 注解后需重新 `just gen` 以触发对应 plugin
 - 各 plugin 的合并测试套件位于对应 `cmd/protoc-gen-servora-*/`；CRUD generator 变更需运行 `go test ./cmd/protoc-gen-servora-crud`、`just gen` 与 `just gen-ts`。
 - 修改 `protoc-gen-typescript-http` 后运行 `go test ./cmd/protoc-gen-typescript-http/...`、`just gen-ts`、`just web-typecheck` 和 `just web-build`；生成契约测试位于 `internal/plugin/generate_test.go`
+- 修改 `protoc-gen-go-errors` 后运行 `go test ./cmd/protoc-gen-go-errors`、`GOWORK=off go test ./cmd/protoc-gen-go-errors`、`just gen`、`just gen-ts`、`just web-typecheck` 和 `just web-test`。

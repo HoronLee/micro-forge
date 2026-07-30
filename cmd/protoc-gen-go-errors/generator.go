@@ -13,7 +13,11 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
-const generatedSuffix = "_errors.pb.go"
+const (
+	generatedSuffix           = "_errors.pb.go"
+	generatorTargetGo         = "go"
+	generatorTargetTypeScript = "ts"
+)
 
 var (
 	fmtPackage    = protogen.GoImportPath("fmt")
@@ -27,26 +31,49 @@ type errorEntry struct {
 	comment  string
 }
 
-func generate(plugin *protogen.Plugin) error {
+type errorEnumModel struct {
+	enum    *protogen.Enum
+	values  []*protogen.EnumValue
+	entries []errorEntry
+}
+
+type errorFileModel struct {
+	enums        []errorEnumModel
+	goEntryCount int
+}
+
+func generate(plugin *protogen.Plugin, target string) error {
+	if target != generatorTargetGo && target != generatorTargetTypeScript {
+		return fmt.Errorf(
+			"unsupported generation target %q: want %q or %q",
+			target,
+			generatorTargetGo,
+			generatorTargetTypeScript,
+		)
+	}
+
 	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
 	for _, file := range plugin.Files {
 		if !file.Generate {
 			continue
 		}
-		if err := generateFile(plugin, file); err != nil {
+		model, err := analyzeErrorFile(file)
+		if err != nil {
 			return err
+		}
+		switch target {
+		case generatorTargetGo:
+			generateGoFile(plugin, file, model)
+		case generatorTargetTypeScript:
+			generateTypeScriptFile(plugin, file, model)
 		}
 	}
 	return nil
 }
 
-func generateFile(plugin *protogen.Plugin, file *protogen.File) error {
-	entries, err := collectEntries(file)
-	if err != nil {
-		return err
-	}
-	if len(entries) == 0 {
-		return nil
+func generateGoFile(plugin *protogen.Plugin, file *protogen.File, model errorFileModel) {
+	if model.goEntryCount == 0 {
+		return
 	}
 
 	generated := plugin.NewGeneratedFile(file.GeneratedFilenamePrefix+generatedSuffix, file.GoImportPath)
@@ -59,63 +86,80 @@ func generateFile(plugin *protogen.Plugin, file *protogen.File) error {
 	generated.P("const _ = ", errorsPackage.Ident("SupportPackageIsVersion1"))
 	generated.P()
 
-	for _, entry := range entries {
-		if entry.comment != "" {
-			generated.P(entry.comment)
+	for _, enum := range model.enums {
+		for _, entry := range enum.entries {
+			if entry.comment != "" {
+				generated.P(entry.comment)
+			}
+			generated.P("func Is", entry.function, "(err error) bool {")
+			generated.P("if err == nil {")
+			generated.P("return false")
+			generated.P("}")
+			generated.P("e := ", errorsPackage.Ident("FromError"), "(err)")
+			generated.P("return e.Reason == ", entry.value.GoIdent, ".String() && e.Code == ", entry.code)
+			generated.P("}")
+			generated.P()
+			if entry.comment != "" {
+				generated.P(entry.comment)
+			}
+			generated.P("func Error", entry.function, "(format string, args ...any) *", errorsPackage.Ident("Error"), " {")
+			generated.P(
+				"return ", errorsPackage.Ident("New"), "(", entry.code, ", ",
+				entry.value.GoIdent, ".String(), ", fmtPackage.Ident("Sprintf"), "(format, args...))",
+			)
+			generated.P("}")
+			generated.P()
 		}
-		generated.P("func Is", entry.function, "(err error) bool {")
-		generated.P("if err == nil {")
-		generated.P("return false")
-		generated.P("}")
-		generated.P("e := ", errorsPackage.Ident("FromError"), "(err)")
-		generated.P("return e.Reason == ", entry.value.GoIdent, ".String() && e.Code == ", entry.code)
-		generated.P("}")
-		generated.P()
-		if entry.comment != "" {
-			generated.P(entry.comment)
-		}
-		generated.P("func Error", entry.function, "(format string, args ...any) *", errorsPackage.Ident("Error"), " {")
-		generated.P(
-			"return ", errorsPackage.Ident("New"), "(", entry.code, ", ",
-			entry.value.GoIdent, ".String(), ", fmtPackage.Ident("Sprintf"), "(format, args...))",
-		)
-		generated.P("}")
-		generated.P()
 	}
-	return nil
 }
 
-func collectEntries(file *protogen.File) ([]errorEntry, error) {
-	var entries []errorEntry
+func analyzeErrorFile(file *protogen.File) (errorFileModel, error) {
+	var model errorFileModel
 	for _, enum := range file.Enums {
 		defaultCode, hasDefault, err := optionCode(enum.Desc.Options(), errorsv1.E_DefaultCode)
 		if err != nil {
-			return nil, fmt.Errorf("%s default error code: %w", enum.Desc.FullName(), err)
+			return errorFileModel{}, fmt.Errorf("%s default error code: %w", enum.Desc.FullName(), err)
 		}
+
+		enumModel := errorEnumModel{
+			enum:   enum,
+			values: enum.Values,
+		}
+		recognized := hasDefault
 		for _, value := range enum.Values {
 			code := defaultCode
 			override, hasOverride, optionErr := optionCode(value.Desc.Options(), errorsv1.E_Code)
 			if optionErr != nil {
-				return nil, fmt.Errorf("%s error code: %w", value.Desc.FullName(), optionErr)
+				return errorFileModel{}, fmt.Errorf("%s error code: %w", value.Desc.FullName(), optionErr)
 			}
 			if hasOverride {
 				code = override
+				recognized = true
 			}
 			if !hasDefault && !hasOverride {
 				continue
 			}
 			if code < 100 || code > 599 {
-				return nil, fmt.Errorf("%s error code %d is outside HTTP status range 100..599", value.Desc.FullName(), code)
+				return errorFileModel{}, fmt.Errorf(
+					"%s error code %d is outside HTTP status range 100..599",
+					value.Desc.FullName(),
+					code,
+				)
 			}
-			entries = append(entries, errorEntry{
+			enumModel.entries = append(enumModel.entries, errorEntry{
 				value:    value,
 				code:     code,
 				function: camelIdentifier(string(value.Desc.Name())),
 				comment:  enumValueComment(value),
 			})
 		}
+		if !recognized {
+			continue
+		}
+		model.goEntryCount += len(enumModel.entries)
+		model.enums = append(model.enums, enumModel)
 	}
-	return entries, nil
+	return model, nil
 }
 
 func optionCode(message proto.Message, extension protoreflect.ExtensionType) (int32, bool, error) {

@@ -95,7 +95,7 @@ func runGenerator(t *testing.T, target *descriptorpb.FileDescriptorProto) map[st
 	if err != nil {
 		t.Fatalf("protogen.Options.New: %v", err)
 	}
-	if err := generate(plugin); err != nil {
+	if err := generate(plugin, generatorTargetGo); err != nil {
 		t.Fatalf("generate: %v", err)
 	}
 

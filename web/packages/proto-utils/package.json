@@ -1,6 +1,6 @@
 {
     "name": "@servora/proto-utils",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "description": "Servora Proto 工具：CRUD 查询、FieldMask、ProtoJSON 与 Kratos 错误解析",
     "type": "module",
     "exports": {
@@ -16,6 +16,10 @@
             "types": "./dist/gen/*/index.d.ts",
             "import": "./dist/gen/*/index.js"
         },
+        "./error-reasons/*": {
+            "types": "./dist/gen/*.errors.d.ts",
+            "import": "./dist/gen/*.errors.js"
+        },
         "./errors": {
             "types": "./dist/errors.d.ts",
             "import": "./dist/errors.js"
@@ -30,7 +34,8 @@
         "build": "tsc -p tsconfig.build.json",
         "clean": "rm -rf dist",
         "typecheck": "tsc --noEmit",
-        "test": "pnpm run build && node --test test/*.test.mjs",
+        "typecheck:test": "tsc -p test/tsconfig.json",
+        "test": "pnpm run build && pnpm run typecheck:test && node --test test/*.test.mjs",
         "prepublishOnly": "npm run clean && npm run build"
     },
     "repository": {
