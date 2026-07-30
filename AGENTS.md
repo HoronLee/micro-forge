@@ -28,8 +28,9 @@ Servora 是 ProtoBuf-contract-first 的模块化框架库。仓库同时包含 G
 
 ## 版本与 tag
 
-- 修改 `core/`、`transport/`、`security/`、`obs/`、`contrib/`、`cmd/`、`api/protos/` 中影响使用者的代码时，主模块打 `git tag v0.x.y`。
-- proto 或 `api/gen/` 产物变化时，额外执行 `just tag-api v0.x.y`，生成 `api/gen/v0.x.y` tag。
+- v1.0 前所有发布统一只递增 patch（每次 `+0.0.1`）；breaking change 也使用下一个 patch，但必须在 Release 与迁移说明中显式标记，不能让使用者从 pre-v1 patch 推断兼容性。
+- 修改 `core/`、`transport/`、`security/`、`obs/`、`contrib/`、`cmd/`、`api/protos/` 中影响使用者的代码时，主模块最终打 `git tag v0.x.y`。
+- proto 或 `api/gen/` 产物变化时，必须先执行 `just tag-api v0.x.y` 并发布 `api/gen/v0.x.y`；完成主模块依赖更新和独立验证后，才打主 tag `v0.x.y`。
 - 生成器（`cmd/protoc-gen-servora-*`）改动导致 `api/gen/` 产物变化时，即使 `.proto` 未变，也要打 `api/gen` tag。
 - 仅文档、justfile、CI、基础设施配置变更通常不打 tag。
 - 修改 `web/packages/proto-utils/` 并需要发布 npm 时，更新包版本后打 `proto-utils/vx.y.z` tag；这个 tag 只触发 npm 发布 workflow，不触发 Go release。
@@ -48,7 +49,7 @@ Annotation extension 号段：
 
 | 注解 | 编号 | 消费者 |
 | --- | --- | --- |
-| `servora.audit.v1.audit_rule` | 50100 | `protoc-gen-servora-audit` |
+| `servora.audit.v1.rule` | 50100 | `protoc-gen-servora-audit` |
 | `servora.audit.v1.service_default` | 50101 | `protoc-gen-servora-audit` |
 | `servora.authz.v1.rule` | 50200 | `protoc-gen-servora-authz` |
 | `servora.authz.v1.service_default` | 50201 | `protoc-gen-servora-authz` |
@@ -72,8 +73,9 @@ Annotation extension 号段：
 3. 执行 `just gen`；删除/重命名 proto 或移除 plugin 时用 `just gen-fresh`。
 4. 如果前端需要消费内建 proto TS 类型，执行 `just gen-ts`。
 5. 执行 `go build ./...` 或更窄的相关测试；涉及 `web/` 时再执行 `just web-typecheck` 和 `just web-build`。
-6. 打主 tag；如有 proto/gen 产物变化，执行 `just tag-api v0.x.y`。
-7. BSR 日常推送由 GitHub Actions 处理；`just bsr-push` 仅作本地预演或应急。
+6. 如有 proto / `api/gen` 产物变化，先在实现提交上执行 `just tag-api v0.x.y` 并推送 `api/gen/v0.x.y`，等待生成模块可解析。
+7. 主模块若消费了新生成 API，再把 `go.mod` 更新到该 `api/gen` 版本，执行 `go mod tidy` 与 `GOWORK=off` 关键测试；推送并等待 CI 通过后，最后打主 tag `v0.x.y`。未消费新生成 API 时也必须先发布 `api/gen`，再打主 tag。
+8. BSR 日常推送由 GitHub Actions 处理；`just bsr-push` 仅作本地预演或应急。
 
 修改 `@servora/proto-utils`：
 

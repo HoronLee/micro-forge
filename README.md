@@ -248,7 +248,7 @@ Servora 提供了声明式、 AIP 风格约束的 CRUD 生态框架，用户只�
 
 #### 审计
 
-通过 `audit_rule` 或 `service_default` 声明 RPC 是否进入通用审计。注解只表达开关；事件类型、业务目标、详情 data 和扩展属性由事件生产者负责，例如 authn/authz middleware、后续 CRUD generator 或业务显式 emit。通用 RPC 审计事件以 [CloudEvents](https://cloudevents.io/) 投递。
+通过 `rule` 或 `service_default` 声明 RPC 是否进入通用审计。注解只表达开关；事件类型、业务目标、详情 data 和扩展属性由事件生产者负责，例如 authn/authz middleware、后续 CRUD generator 或业务显式 emit。通用 RPC 审计事件以 [CloudEvents](https://cloudevents.io/) 投递。
 
 ```proto
 import "servora/audit/v1/annotations.proto";
@@ -257,12 +257,14 @@ service ResourceService {
   option (servora.audit.v1.service_default) = { mode: AUDIT_MODE_ENABLED };
 
   rpc CreateResource(CreateResourceRequest) returns (Resource) {
-    option (servora.audit.v1.audit_rule) = {
+    option (servora.audit.v1.rule) = {
       mode: AUDIT_MODE_ENABLED
     };
   }
 }
 ```
+
+> **v0.8.7 破坏性迁移：** method option 已从 `servora.audit.v1.audit_rule` 硬切换为 `servora.audit.v1.rule`，Go extension 同步从 `auditv1.E_AuditRule` 改为 `auditv1.E_Rule`；extension number 仍为 `50100`，不提供 deprecated alias。升级生成模块使用 `go get github.com/Servora-Kit/servora/api/gen@v0.8.7`。
 
 Plugin 生成 `AuditRules()` 规则表，业务侧把 `Auditor` 实现（默认 Kafka）跟规则表一起挂到 middleware：
 

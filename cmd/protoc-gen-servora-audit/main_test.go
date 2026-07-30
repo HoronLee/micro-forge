@@ -1,11 +1,15 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 
 	auditv1 "github.com/Servora-Kit/servora/api/gen/go/servora/audit/v1"
+	"github.com/bufbuild/protocompile"
+	"github.com/bufbuild/protocompile/wellknownimports"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -115,7 +119,7 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 			}
 			if m.rule != nil {
 				opts := &descriptorpb.MethodOptions{}
-				proto.SetExtension(opts, auditv1.E_AuditRule, m.rule)
+				proto.SetExtension(opts, auditv1.E_Rule, m.rule)
 				mp.Options = opts
 			}
 			sp.Method = append(sp.Method, mp)
@@ -162,6 +166,45 @@ func keysOf[V any](m map[string]V) []string {
 	}
 	sort.Strings(ks)
 	return ks
+}
+
+func TestMethodExtensionContract(t *testing.T) {
+	desc := auditv1.E_Rule.TypeDescriptor()
+	if got, want := desc.FullName(), protoreflect.FullName("servora.audit.v1.rule"); got != want {
+		t.Fatalf("method extension full name = %q; want %q", got, want)
+	}
+	if got, want := desc.Number(), protoreflect.FieldNumber(50100); got != want {
+		t.Fatalf("method extension number = %d; want %d", got, want)
+	}
+	if _, err := protoregistry.GlobalTypes.FindExtensionByName("servora.audit.v1.audit_rule"); err == nil {
+		t.Fatal("legacy servora.audit.v1.audit_rule extension must not be registered")
+	}
+}
+
+func TestLegacyMethodOptionRejectedByCompiler(t *testing.T) {
+	annotations, err := os.ReadFile(filepath.Join("..", "..", "api", "protos", "servora", "audit", "v1", "annotations.proto"))
+	if err != nil {
+		t.Fatalf("read audit annotations proto: %v", err)
+	}
+	legacy, err := os.ReadFile(filepath.Join("testdata", "legacy_audit_rule.proto"))
+	if err != nil {
+		t.Fatalf("read legacy fixture: %v", err)
+	}
+
+	resolver := &protocompile.SourceResolver{
+		Accessor: protocompile.SourceAccessorFromMap(map[string]string{
+			"servora/audit/v1/annotations.proto": string(annotations),
+			"legacy/v1/legacy.proto":             string(legacy),
+		}),
+	}
+	compiler := protocompile.Compiler{
+		Resolver: wellknownimports.WithStandardImports(resolver),
+	}
+	if _, err := compiler.Compile(t.Context(), "legacy/v1/legacy.proto"); err == nil {
+		t.Fatal("legacy audit_rule fixture unexpectedly compiled")
+	} else if want := "servora.audit.v1.audit_rule"; !strings.Contains(err.Error(), want) {
+		t.Fatalf("legacy fixture failed for the wrong reason; want %q in error: %v", want, err)
+	}
 }
 
 // ── basic behaviour ──────────────────────────────────────────────────────────

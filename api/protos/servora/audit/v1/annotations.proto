@@ -26,13 +26,13 @@ message AuditRule {
   AuditMode mode = 1;
 }
 
-// audit_rule is the per-method annotation.
+// rule is the per-method annotation.
 extend google.protobuf.MethodOptions {
-  AuditRule audit_rule = 50100;
+  AuditRule rule = 50100;
 }
 
 // service_default sets the fallback AuditRule for methods that do not declare
-// an explicit audit_rule. Method-level audit_rule takes precedence.
+// an explicit rule. Method-level rule takes precedence.
 extend google.protobuf.ServiceOptions {
   AuditRule service_default = 50101;
 }

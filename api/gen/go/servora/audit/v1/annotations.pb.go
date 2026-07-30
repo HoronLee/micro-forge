@@ -130,8 +130,8 @@ var file_servora_audit_v1_annotations_proto_extTypes = []protoimpl.ExtensionInfo
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
 		ExtensionType: (*AuditRule)(nil),
 		Field:         50100,
-		Name:          "servora.audit.v1.audit_rule",
-		Tag:           "bytes,50100,opt,name=audit_rule",
+		Name:          "servora.audit.v1.rule",
+		Tag:           "bytes,50100,opt,name=rule",
 		Filename:      "servora/audit/v1/annotations.proto",
 	},
 	{
@@ -146,8 +146,8 @@ var file_servora_audit_v1_annotations_proto_extTypes = []protoimpl.ExtensionInfo
 
 // Extension fields to descriptorpb.MethodOptions.
 var (
-	// optional servora.audit.v1.AuditRule audit_rule = 50100;
-	E_AuditRule = &file_servora_audit_v1_annotations_proto_extTypes[0]
+	// optional servora.audit.v1.AuditRule rule = 50100;
+	E_Rule = &file_servora_audit_v1_annotations_proto_extTypes[0]
 )
 
 // Extension fields to descriptorpb.ServiceOptions.
@@ -166,9 +166,8 @@ const file_servora_audit_v1_annotations_proto_rawDesc = "" +
 	"\tAuditMode\x12\x1a\n" +
 	"\x16AUDIT_MODE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13AUDIT_MODE_DISABLED\x10\x01\x12\x16\n" +
-	"\x12AUDIT_MODE_ENABLED\x10\x02:\\\n" +
-	"\n" +
-	"audit_rule\x12\x1e.google.protobuf.MethodOptions\x18\xb4\x87\x03 \x01(\v2\x1b.servora.audit.v1.AuditRuleR\tauditRule:g\n" +
+	"\x12AUDIT_MODE_ENABLED\x10\x02:Q\n" +
+	"\x04rule\x12\x1e.google.protobuf.MethodOptions\x18\xb4\x87\x03 \x01(\v2\x1b.servora.audit.v1.AuditRuleR\x04rule:g\n" +
 	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\xb5\x87\x03 \x01(\v2\x1b.servora.audit.v1.AuditRuleR\x0eserviceDefaultBDZBgithub.com/Servora-Kit/servora/api/gen/go/servora/audit/v1;auditv1b\x06proto3"
 
 var (
@@ -193,9 +192,9 @@ var file_servora_audit_v1_annotations_proto_goTypes = []any{
 }
 var file_servora_audit_v1_annotations_proto_depIdxs = []int32{
 	0, // 0: servora.audit.v1.AuditRule.mode:type_name -> servora.audit.v1.AuditMode
-	2, // 1: servora.audit.v1.audit_rule:extendee -> google.protobuf.MethodOptions
+	2, // 1: servora.audit.v1.rule:extendee -> google.protobuf.MethodOptions
 	3, // 2: servora.audit.v1.service_default:extendee -> google.protobuf.ServiceOptions
-	1, // 3: servora.audit.v1.audit_rule:type_name -> servora.audit.v1.AuditRule
+	1, // 3: servora.audit.v1.rule:type_name -> servora.audit.v1.AuditRule
 	1, // 4: servora.audit.v1.service_default:type_name -> servora.audit.v1.AuditRule
 	5, // [5:5] is the sub-list for method output_type
 	5, // [5:5] is the sub-list for method input_type

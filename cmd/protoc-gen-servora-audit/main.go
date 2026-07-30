@@ -149,17 +149,17 @@ func generate(gen *protogen.Plugin) error {
 	return nil
 }
 
-// methodRule extracts the AuditRule attached to a method via E_AuditRule,
+// methodRule extracts the AuditRule attached to a method via E_Rule,
 // returning hasMethod == true only when the extension is present.
 func methodRule(m *protogen.Method) (*auditv1.AuditRule, bool) {
 	opts := m.Desc.Options()
 	if opts == nil {
 		return nil, false
 	}
-	if !proto.HasExtension(opts, auditv1.E_AuditRule) {
+	if !proto.HasExtension(opts, auditv1.E_Rule) {
 		return nil, false
 	}
-	r, ok := proto.GetExtension(opts, auditv1.E_AuditRule).(*auditv1.AuditRule)
+	r, ok := proto.GetExtension(opts, auditv1.E_Rule).(*auditv1.AuditRule)
 	if !ok || r == nil {
 		return nil, false
 	}
