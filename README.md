@@ -316,7 +316,7 @@ just gen     # 增量生成 Go 代码
 
 ## 星的轨迹⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Servora-Kit/servora&type=Date)](https://star-history.com/#Servora-Kit/servora&Date)
+[![Star History Chart](https://api.star-history.com/chart?repos=Servora-Kit/servora&type=date&legend=top-left&sealed_token=H00oH2v4zGvRlY242_iefrjI09EcSuxdn7klwqaZrFY_N77OGV_bAN_zQoSaS6tKwSfhhwu7j4c0LtG8u2A0x4nbBp1sZ7AmfcpVr3kED9ogpQqocsohmA)](https://www.star-history.com/?type=date&repos=Servora-Kit%2Fservora)
 
 ## 鸣谢🙏
 
