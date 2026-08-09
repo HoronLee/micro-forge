@@ -38,10 +38,18 @@ function encodeMultiSegmentPath(value: unknown): string {
     .join('/');
 }
 
+// AuthnMode 表达认证模式三态。
+export type AuthnMode =
+  // 显式公开。schemes 必须为空。
+  | 'AUTHN_MODE_PUBLIC'
+  // 必须用 schemes 指定的认证机制。schemes 必须非空。
+  | 'AUTHN_MODE_REQUIRED'
+  // 未指定，等价“未写注解”：私有 + 框架默认引擎（fail-closed 默认）。
+  | 'AUTHN_MODE_UNSPECIFIED';
 // AuthnRule 声明 RPC 方法的认证策略。
 export type AuthnRule = {
   // 认证模式。
-  mode?: AuthnRule_Mode;
+  mode?: AuthnMode;
   // 接受的认证机制；空列表表示沿用框架默认引擎。
   // 取值是各 wrapper 子包持有的私有 method 字符串常量（如 `jwt`、`mtls`、`api_key`、`aksk`）；
   // framework 不枚举这些值，业务自定义引擎也可填任意字符串。
@@ -49,14 +57,6 @@ export type AuthnRule = {
   schemes?: string[];
 };
 
-// Mode 表达认证模式三态。
-export type AuthnRule_Mode =
-  // 显式公开。schemes 必须为空。
-  | 'MODE_PUBLIC'
-  // 必须用 schemes 指定的认证机制。schemes 必须非空。
-  | 'MODE_REQUIRED'
-  // 未指定，等价"未写注解"：私有 + 框架默认引擎（fail-closed 默认）。
-  | 'MODE_UNSPECIFIED';
 // AuthnErrorReason defines stable client-visible authentication failures.
 export type AuthnErrorReason =
   // The authentication contract or framework invariant was violated.

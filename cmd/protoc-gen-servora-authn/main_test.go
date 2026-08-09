@@ -1,14 +1,11 @@
 package main
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 
 	authnpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/v1"
+	"github.com/Servora-Kit/servora/cmd/internal/plugintest"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -123,16 +120,6 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 	return fp
 }
 
-// generatedFiles extracts {path: content} from a Plugin's response.
-func generatedFiles(t *testing.T, gen *protogen.Plugin) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	for _, f := range gen.Response().File {
-		out[f.GetName()] = f.GetContent()
-	}
-	return out
-}
-
 func TestNoAnnotations_NoFileGenerated(t *testing.T) {
 	gen, err := runPluginScenario(t, []fileSpec{
 		{
@@ -153,7 +140,7 @@ func TestNoAnnotations_NoFileGenerated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	if len(files) != 0 {
 		t.Fatalf("expected no generated files, got: %v", files)
 	}
@@ -170,7 +157,7 @@ func TestMethodLevelPublic_GeneratesPublicRule(t *testing.T) {
 				{
 					name: "GreetingService",
 					methods: []methodSpec{
-						{name: "SayHello", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_PUBLIC}},
+						{name: "SayHello", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC}},
 					},
 				},
 			},
@@ -179,8 +166,8 @@ func TestMethodLevelPublic_GeneratesPublicRule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthnFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authn_rules.gen.go")
 	wantOp := `"/example.v1.GreetingService/SayHello"`
 	if !strings.Contains(content, wantOp) {
 		t.Fatalf("public methods missing %s\n--- generated ---\n%s", wantOp, content)
@@ -198,7 +185,7 @@ func TestServiceDefault_MethodInherits(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authnpb.AuthnRule{
-						Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+						Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 						Schemes: []string{"jwt"},
 					},
 					methods: []methodSpec{
@@ -211,8 +198,8 @@ func TestServiceDefault_MethodInherits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthnFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authn_rules.gen.go")
 	wantKey := `"/example.v1.GreetingService/SayHello"`
 	if !strings.Contains(content, wantKey) {
 		t.Fatalf("inherited rule missing operation key %s\n--- generated ---\n%s", wantKey, content)
@@ -233,11 +220,11 @@ func TestMethodOverridesServiceDefault_PublicWins(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authnpb.AuthnRule{
-						Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+						Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 						Schemes: []string{"jwt"},
 					},
 					methods: []methodSpec{
-						{name: "PublicHello", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_PUBLIC}},
+						{name: "PublicHello", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC}},
 						{name: "PrivateHello"}, // inherits REQUIRED + jwt
 					},
 				},
@@ -247,22 +234,22 @@ func TestMethodOverridesServiceDefault_PublicWins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthnFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authn_rules.gen.go")
 	publicOp := `"/example.v1.GreetingService/PublicHello"`
 	privateOp := `"/example.v1.GreetingService/PrivateHello"`
 
 	if !strings.Contains(content, publicOp) {
 		t.Errorf("PublicHello missing from generated rules:\n%s", content)
 	}
-	if !strings.Contains(content, "AuthnRule_MODE_PUBLIC") {
-		t.Errorf("PublicHello should carry MODE_PUBLIC:\n%s", content)
+	if !strings.Contains(content, "AuthnMode_AUTHN_MODE_PUBLIC") {
+		t.Errorf("PublicHello should carry AUTHN_MODE_PUBLIC:\n%s", content)
 	}
 	if !strings.Contains(content, privateOp) {
 		t.Errorf("PrivateHello missing from generated rules:\n%s", content)
 	}
-	if !strings.Contains(content, "AuthnRule_MODE_REQUIRED") || !strings.Contains(content, `"jwt"`) {
-		t.Errorf("PrivateHello should inherit REQUIRED + jwt:\n%s", content)
+	if !strings.Contains(content, "AuthnMode_AUTHN_MODE_REQUIRED") || !strings.Contains(content, `"jwt"`) {
+		t.Errorf("PrivateHello should inherit AUTHN_MODE_REQUIRED + jwt:\n%s", content)
 	}
 }
 
@@ -277,7 +264,7 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 				{
 					name: "UserService",
 					serviceDefault: &authnpb.AuthnRule{
-						Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+						Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 						Schemes: []string{"jwt"},
 					},
 					methods: []methodSpec{{name: "Get"}},
@@ -293,7 +280,7 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 				{
 					name: "UserService",
 					serviceDefault: &authnpb.AuthnRule{
-						Mode: authnpb.AuthnRule_MODE_PUBLIC,
+						Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC,
 					},
 					methods: []methodSpec{{name: "Get"}},
 				},
@@ -304,11 +291,11 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
 
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	accounts := files["example.com/gen/accounts/v1/authn_rules.gen.go"]
 	admin := files["example.com/gen/admin/v1/authn_rules.gen.go"]
 	if accounts == "" || admin == "" {
-		t.Fatalf("expected generated authn files for both packages, got: %v", keysOf(files))
+		t.Fatalf("expected generated authn files for both packages, got: %v", plugintest.SortedKeys(files))
 	}
 	if !strings.Contains(accounts, `"/accounts.v1.UserService/Get"`) {
 		t.Fatalf("accounts rule missing full-name operation\n--- generated ---\n%s", accounts)
@@ -322,7 +309,7 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 	if !strings.Contains(admin, `"/admin.v1.UserService/Get"`) {
 		t.Fatalf("admin public rule missing full-name operation\n--- generated ---\n%s", admin)
 	}
-	if !strings.Contains(admin, "AuthnRule_MODE_PUBLIC") || strings.Contains(admin, `"jwt"`) {
+	if !strings.Contains(admin, "AuthnMode_AUTHN_MODE_PUBLIC") || strings.Contains(admin, `"jwt"`) {
 		t.Fatalf("admin output inherited accounts rule unexpectedly\n--- generated ---\n%s", admin)
 	}
 }
@@ -339,7 +326,7 @@ func TestInvalid_PublicWithSchemes(t *testing.T) {
 					name: "BadService",
 					methods: []methodSpec{
 						{name: "BadOp", rule: &authnpb.AuthnRule{
-							Mode:    authnpb.AuthnRule_MODE_PUBLIC,
+							Mode:    authnpb.AuthnMode_AUTHN_MODE_PUBLIC,
 							Schemes: []string{"jwt"},
 						}},
 					},
@@ -351,7 +338,7 @@ func TestInvalid_PublicWithSchemes(t *testing.T) {
 		t.Fatalf("expected validation error for PUBLIC + non-empty schemes, got nil")
 	}
 	msg := err.Error()
-	for _, want := range []string{"example/v1/bad.proto", "BadService", "BadOp", "MODE_PUBLIC", "schemes"} {
+	for _, want := range []string{"example/v1/bad.proto", "BadService", "BadOp", "AUTHN_MODE_PUBLIC", "schemes"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error message missing %q\n--- got ---\n%s", want, msg)
 		}
@@ -370,7 +357,7 @@ func TestRequiredWithEmptySchemes_GeneratesDefaultEngineRule(t *testing.T) {
 					name: "DefaultService",
 					methods: []methodSpec{
 						{name: "SecureOp", rule: &authnpb.AuthnRule{
-							Mode: authnpb.AuthnRule_MODE_REQUIRED,
+							Mode: authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 						}},
 					},
 				},
@@ -380,13 +367,13 @@ func TestRequiredWithEmptySchemes_GeneratesDefaultEngineRule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthnFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authn_rules.gen.go")
 	if !strings.Contains(content, `"/example.v1.DefaultService/SecureOp"`) {
 		t.Fatalf("REQUIRED empty-schemes rule missing operation\n--- generated ---\n%s", content)
 	}
-	if !strings.Contains(content, "AuthnRule_MODE_REQUIRED") {
-		t.Fatalf("REQUIRED empty-schemes rule missing mode\n--- generated ---\n%s", content)
+	if !strings.Contains(content, "AuthnMode_AUTHN_MODE_REQUIRED") {
+		t.Fatalf("AUTHN_MODE_REQUIRED empty-schemes rule missing mode\n--- generated ---\n%s", content)
 	}
 	if strings.Contains(content, "Schemes:") {
 		t.Fatalf("REQUIRED empty-schemes rule should not emit Schemes field\n--- generated ---\n%s", content)
@@ -416,7 +403,7 @@ func TestInvalid_UnspecifiedWithSchemes(t *testing.T) {
 		t.Fatalf("expected validation error for UNSPECIFIED + non-empty schemes, got nil")
 	}
 	msg := err.Error()
-	for _, want := range []string{"example/v1/bad.proto", "BadService", "BadOp", "MODE_UNSPECIFIED", "schemes"} {
+	for _, want := range []string{"example/v1/bad.proto", "BadService", "BadOp", "AUTHN_MODE_UNSPECIFIED", "schemes"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error message missing %q\n--- got ---\n%s", want, msg)
 		}
@@ -438,12 +425,12 @@ func TestGeneratedAccessorsReturnIndependentCopies(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authnpb.AuthnRule{
-						Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+						Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 						Schemes: []string{"jwt"},
 					},
 					methods: []methodSpec{
 						{name: "SayHello"},
-						{name: "Healthz", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_PUBLIC}},
+						{name: "Healthz", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC}},
 					},
 				},
 			},
@@ -452,8 +439,8 @@ func TestGeneratedAccessorsReturnIndependentCopies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthnFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authn_rules.gen.go")
 	// AuthnRules accessor must use pb rules, declare a single aggregate
 	// function, and clone protobuf messages. The protobuf package alias is
 	// chosen by protogen, so assert the contract instead of a fixed alias.
@@ -498,14 +485,14 @@ func TestGeneratedFileCompiles(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authnpb.AuthnRule{
-						Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+						Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 						Schemes: []string{"jwt"},
 					},
 					methods: []methodSpec{
 						{name: "SayHello"},
-						{name: "Healthz", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_PUBLIC}},
+						{name: "Healthz", rule: &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC}},
 						{name: "AdminPurge", rule: &authnpb.AuthnRule{
-							Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+							Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 							Schemes: []string{"mtls", "jwt"},
 						}},
 					},
@@ -516,56 +503,25 @@ func TestGeneratedFileCompiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	src := lookupAuthnFile(t, files)
-
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module sandbox\n\ngo 1.22\n"), 0o644); err != nil {
-		t.Fatalf("write go.mod: %v", err)
-	}
-	// The generated file declares `package examplev1`; realign it so go vet
-	// can type-check the file as part of the sandbox module root.
-	rewrite := src
-	rewrite = strings.Replace(rewrite, "package examplev1", "package sandbox", 1)
-	if err := os.WriteFile(filepath.Join(dir, "authn_rules.gen.go"), []byte(rewrite), 0o644); err != nil {
-		t.Fatalf("write generated file: %v", err)
-	}
-
-	cmd := exec.Command("go", "vet", "./...")
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("go vet failed on generated file:\n%s\n--- source ---\n%s", out, rewrite)
-	}
+	source := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "authn_rules.gen.go")
+	plugintest.AssertGeneratedGoCompiles(t, source, "examplev1")
 }
 
-// lookupAuthnFile finds the unique authn_rules.gen.go entry produced by the
-// plugin, regardless of the directory prefix that protogen derived from
-// go_package. Tests that expect exactly one generated file should use this.
-func lookupAuthnFile(t *testing.T, files map[string]string) string {
-	t.Helper()
-	var matches []string
-	for k := range files {
-		if strings.HasSuffix(k, "/authn_rules.gen.go") || k == "authn_rules.gen.go" {
-			matches = append(matches, k)
-		}
+func TestUnknownModeRejected(t *testing.T) {
+	_, err := runPluginScenario(t, []fileSpec{{
+		name:     "example/v1/bad.proto",
+		pkg:      "example.v1",
+		goPkg:    "example.com/gen/example/v1;examplev1",
+		generate: true,
+		services: []serviceSpec{{
+			name: "BadService",
+			methods: []methodSpec{{
+				name: "BadOp",
+				rule: &authnpb.AuthnRule{Mode: authnpb.AuthnMode(99)},
+			}},
+		}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "unknown AuthnMode 99") {
+		t.Fatalf("generate error = %v, want unknown AuthnMode", err)
 	}
-	if len(matches) == 0 {
-		t.Fatalf("expected an authn_rules.gen.go in output, got: %v", keysOf(files))
-	}
-	if len(matches) > 1 {
-		t.Fatalf("expected exactly one authn_rules.gen.go, got: %v", matches)
-	}
-	return files[matches[0]]
-}
-
-// keysOf returns sorted keys for a string-keyed map (debug helper).
-func keysOf[V any](m map[string]V) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	return ks
 }

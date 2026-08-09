@@ -152,7 +152,7 @@ import "servora/authn/v1/annotations.proto";
 
 service UserService {
   option (servora.authn.v1.service_default) = {
-    mode: MODE_REQUIRED
+    mode: AUTHN_MODE_REQUIRED
     schemes: ["jwt"]
   };
 
@@ -161,7 +161,7 @@ service UserService {
 
   // 方法级覆盖：完全公开
   rpc Login(LoginRequest) returns (LoginResponse) {
-    option (servora.authn.v1.rule) = { mode: MODE_PUBLIC };
+    option (servora.authn.v1.rule) = { mode: AUTHN_MODE_PUBLIC };
   }
 }
 ```
@@ -187,7 +187,7 @@ mw := authn.Server(
 跟认证同构：`service_default` 声明服务级默认授权策略，方法级 `rule` 可整段覆盖。授权检查由 `action` × `resource_type` × `resource_id_field`（从请求消息中提取资源 ID）三元组定义。默认接入 OpenFGA，可替换为任意实现 `Authorizer` 接口的后端。
 
 ```proto
-import "servora/authz/v1/authz.proto";
+import "servora/authz/v1/annotations.proto";
 
 service VideoService {
   option (servora.authz.v1.service_default) = {

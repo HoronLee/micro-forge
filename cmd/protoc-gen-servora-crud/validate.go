@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func validateStandardMethods(files []*protogen.File, resources map[string]*resourceInfo) error {
+func validateStandardMethods(files []*protogen.File, resources []*resourceInfo) error {
 	for _, resource := range resources {
 		createList := classifyStandardCreateList(resource.patterns)
 		lifecycle := false
@@ -236,33 +236,16 @@ func validateListResponse(method *protogen.Method, resource *resourceInfo) error
 }
 
 func validateLifecycleFields(resource *resourceInfo) error {
-	var visit func(message *protogen.Message, prefix string, inheritedOutputOnly bool) error
-	visit = func(message *protogen.Message, prefix string, inheritedOutputOnly bool) error {
-		for _, field := range message.Fields {
-			path := string(field.Desc.Name())
-			if prefix != "" {
-				path = prefix + "." + path
-			}
-			outputOnly := inheritedOutputOnly || hasBehavior(field.Desc, annotations.FieldBehavior_OUTPUT_ONLY)
-			if err := validateLifecycleField(resource, field.Desc, path, inheritedOutputOnly); err != nil {
-				return err
-			}
-			if field.Message != nil && !field.Desc.IsList() && !field.Desc.IsMap() && !outputOnly && !strings.HasPrefix(string(field.Message.Desc.FullName()), "google.protobuf.") {
-				if err := visit(field.Message, path, false); err != nil {
-					return err
-				}
-			}
+	return walkMessageFields(resource.message, func(walked walkedField) (bool, error) {
+		if err := validateLifecycleField(resource, walked.Field.Desc, walked.Path); err != nil {
+			return false, err
 		}
-		return nil
-	}
-	return visit(resource.message, "", false)
+		return !hasBehavior(walked.Field.Desc, annotations.FieldBehavior_OUTPUT_ONLY), nil
+	})
 }
 
-func validateLifecycleField(resource *resourceInfo, field protoreflect.FieldDescriptor, path string, inheritedOutputOnly bool) error {
+func validateLifecycleField(resource *resourceInfo, field protoreflect.FieldDescriptor, path string) error {
 	fullPath := fmt.Sprintf("%s.%s", resource.message.Desc.FullName(), path)
-	if inheritedOutputOnly {
-		return nil
-	}
 	identifier := hasBehavior(field, annotations.FieldBehavior_IDENTIFIER)
 	required := hasBehavior(field, annotations.FieldBehavior_REQUIRED)
 	optional := hasBehavior(field, annotations.FieldBehavior_OPTIONAL)

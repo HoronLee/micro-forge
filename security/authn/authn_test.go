@@ -148,7 +148,7 @@ func TestServerConstructionValidation(t *testing.T) {
 			Server(
 				[]Authenticator{&fakeAuthenticator{scheme: "jwt"}},
 				WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
-					"/svc/Op": {Mode: authnpb.AuthnRule_MODE_REQUIRED, Schemes: []string{"mtls"}},
+					"/svc/Op": {Mode: authnpb.AuthnMode_AUTHN_MODE_REQUIRED, Schemes: []string{"mtls"}},
 				})),
 			)
 		}, want: `operation "/svc/Op" references unknown scheme "mtls"`},
@@ -156,7 +156,7 @@ func TestServerConstructionValidation(t *testing.T) {
 			Server(
 				[]Authenticator{&fakeAuthenticator{scheme: "jwt"}},
 				WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
-					"/svc/Public": {Mode: authnpb.AuthnRule_MODE_PUBLIC, Schemes: []string{"mtls"}},
+					"/svc/Public": {Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC, Schemes: []string{"mtls"}},
 				})),
 			)
 		}, want: `operation "/svc/Public" references unknown scheme "mtls"`},
@@ -202,7 +202,7 @@ func TestServerPublicRuleSkipsAuthenticators(t *testing.T) {
 	mw := Server(
 		[]Authenticator{a},
 		WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
-			"/svc/Public": {Mode: authnpb.AuthnRule_MODE_PUBLIC},
+			"/svc/Public": {Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC},
 		})),
 	)
 	if _, err := invoke(t, mw, authnContext("/svc/Public")); err != nil {
@@ -220,7 +220,7 @@ func TestServerRuleFilterPreservesInjectionOrder(t *testing.T) {
 		[]Authenticator{first, second},
 		WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
 			"/svc/Op": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+				Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 				Schemes: []string{"api_key", "jwt"},
 			},
 		})),

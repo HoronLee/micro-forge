@@ -19,37 +19,53 @@ func main() {
 	})
 }
 
+type fileResources struct {
+	file      *protogen.File
+	resources []*resourceInfo
+}
+
+type resourceCatalog struct {
+	files   []fileResources
+	ordered []*resourceInfo
+}
+
 func generate(gen *protogen.Plugin, target string) error {
-	resourcesByFile := make(map[*protogen.File][]*resourceInfo)
-	resourcesByName := make(map[string]*resourceInfo)
+	if target != "go" && target != "ts" {
+		return fmt.Errorf("crud: unknown target %q (want go or ts)", target)
+	}
+	catalog, err := buildResourceCatalog(gen)
+	if err != nil {
+		return err
+	}
+	if err := validateStandardMethods(gen.Files, catalog.ordered); err != nil {
+		return err
+	}
+	for _, group := range catalog.files {
+		switch target {
+		case "go":
+			generateGoFile(gen, group.file, group.resources)
+		case "ts":
+			generateTypeScriptFile(gen, group.file, group.resources)
+		}
+	}
+	return nil
+}
+
+func buildResourceCatalog(gen *protogen.Plugin) (resourceCatalog, error) {
+	var catalog resourceCatalog
 	for _, file := range gen.Files {
 		if !file.Generate {
 			continue
 		}
 		resources, err := discoverResources(file)
 		if err != nil {
-			return err
+			return resourceCatalog{}, err
 		}
 		if len(resources) == 0 {
 			continue
 		}
-		resourcesByFile[file] = resources
-		for _, resource := range resources {
-			resourcesByName[string(resource.message.Desc.FullName())] = resource
-		}
+		catalog.files = append(catalog.files, fileResources{file: file, resources: resources})
+		catalog.ordered = append(catalog.ordered, resources...)
 	}
-	if err := validateStandardMethods(gen.Files, resourcesByName); err != nil {
-		return err
-	}
-	for file, resources := range resourcesByFile {
-		switch target {
-		case "go":
-			generateGoFile(gen, file, resources)
-		case "ts":
-			generateTypeScriptFile(gen, file, resources)
-		default:
-			return fmt.Errorf("crud: unknown target %q (want go or ts)", target)
-		}
-	}
-	return nil
+	return catalog, nil
 }

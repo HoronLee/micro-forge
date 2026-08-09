@@ -403,12 +403,19 @@ func makeStringMapField(request *descriptorpb.DescriptorProto, name string) {
 
 func runGenerator(t *testing.T, file *descriptorpb.FileDescriptorProto, target string) (*protogen.Plugin, error) {
 	t.Helper()
+	return runGeneratorFiles(t, []*descriptorpb.FileDescriptorProto{file}, target)
+}
+
+func runGeneratorFiles(t *testing.T, files []*descriptorpb.FileDescriptorProto, target string) (*protogen.Plugin, error) {
+	t.Helper()
 	request := &pluginpb.CodeGeneratorRequest{
-		ProtoFile:      descriptorDependencies(),
-		FileToGenerate: []string{file.GetName()},
-		Parameter:      proto.String("paths=source_relative"),
+		ProtoFile: descriptorDependencies(),
+		Parameter: proto.String("paths=source_relative"),
 	}
-	request.ProtoFile = append(request.ProtoFile, file)
+	for _, file := range files {
+		request.ProtoFile = append(request.ProtoFile, file)
+		request.FileToGenerate = append(request.FileToGenerate, file.GetName())
+	}
 	plugin, err := protogen.Options{}.New(request)
 	if err != nil {
 		t.Fatalf("protogen.Options.New: %v", err)
@@ -614,4 +621,138 @@ func sortedKeys(values map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func TestGenerateValidatesTargetBeforeResources(t *testing.T) {
+	file := validCRUDFile()
+	fieldByName(messageByName(file, "User"), "name").Options = nil
+	_, err := runGenerator(t, file, "java")
+	if err == nil || !strings.Contains(err.Error(), `unknown target "java"`) {
+		t.Fatalf("generate error = %v, want unknown target", err)
+	}
+	if strings.Contains(err.Error(), "IDENTIFIER") {
+		t.Fatalf("target validation ran after resource validation: %v", err)
+	}
+}
+
+func TestGenerateRejectsUnsafePatternVariables(t *testing.T) {
+	tests := []struct {
+		name     string
+		patterns []string
+		want     string
+	}{
+		{
+			name:     "duplicate variable in pattern",
+			patterns: []string{"parents/{parent}/children/{parent}"},
+			want:     `variable "parent" is repeated`,
+		},
+		{
+			name:     "non ASCII identifier",
+			patterns: []string{"tenants/{租户}/users/{user}"},
+			want:     `variable "租户" is not a protobuf ASCII identifier`,
+		},
+		{
+			name:     "Go exported identifier collision",
+			patterns: []string{"tenants/{foo_bar}/users/{user}", "organizations/{fooBar}/users/{user}"},
+			want:     `resource test.v1.User patterns "tenants/{foo_bar}/users/{user}" and "organizations/{fooBar}/users/{user}" use variables "foo_bar" and "fooBar" both generate Go identifier "FooBar"`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			file := validCRUDFile()
+			file.Service = nil
+			resourceOption(messageByName(file, "User")).Pattern = test.patterns
+			_, err := runGenerator(t, file, "go")
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("generate error = %v, want containing %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestGenerateRecursiveResourceMessagesTerminates(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*descriptorpb.FileDescriptorProto)
+	}{
+		{
+			name: "self reference",
+			mutate: func(file *descriptorpb.FileDescriptorProto) {
+				user := messageByName(file, "User")
+				user.Field = append(user.Field, annotatedField("manager", 7, descriptorpb.FieldDescriptorProto_TYPE_MESSAGE, ".test.v1.User", annotations.FieldBehavior_OPTIONAL))
+			},
+		},
+		{
+			name: "mutual reference",
+			mutate: func(file *descriptorpb.FileDescriptorProto) {
+				user := messageByName(file, "User")
+				profile := message("Profile", annotatedField("owner", 1, descriptorpb.FieldDescriptorProto_TYPE_MESSAGE, ".test.v1.User", annotations.FieldBehavior_OPTIONAL))
+				user.Field = append(user.Field, annotatedField("profile", 7, descriptorpb.FieldDescriptorProto_TYPE_MESSAGE, ".test.v1.Profile", annotations.FieldBehavior_OPTIONAL))
+				file.MessageType = append(file.MessageType, profile)
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			file := validCRUDFile()
+			test.mutate(file)
+			if _, err := runGenerator(t, file, "go"); err != nil {
+				t.Fatalf("generate recursive resource: %v", err)
+			}
+		})
+	}
+}
+
+func TestGenerateResponseOrderIsDeterministic(t *testing.T) {
+	first := validCRUDFile()
+	second := proto.Clone(first).(*descriptorpb.FileDescriptorProto)
+	rewriteProtoPackage(second, "test.v1", "other.v1")
+	second.Name = proto.String("other/v1/user.proto")
+	second.Options.GoPackage = proto.String("example.com/other/v1;otherv1")
+
+	var baseline *pluginpb.CodeGeneratorResponse
+	for iteration := range 20 {
+		plugin, err := runGeneratorFiles(t, []*descriptorpb.FileDescriptorProto{first, second}, "go")
+		if err != nil {
+			t.Fatalf("generate iteration %d: %v", iteration, err)
+		}
+		response := plugin.Response()
+		if baseline == nil {
+			baseline = proto.Clone(response).(*pluginpb.CodeGeneratorResponse)
+			continue
+		}
+		if !proto.Equal(response, baseline) {
+			t.Fatalf("iteration %d response differs\nfirst=%v\nnext=%v", iteration, baseline.File, response.File)
+		}
+	}
+}
+
+func rewriteProtoPackage(file *descriptorpb.FileDescriptorProto, oldPackage, newPackage string) {
+	file.Package = proto.String(newPackage)
+	oldPrefix := "." + oldPackage + "."
+	newPrefix := "." + newPackage + "."
+	var rewriteMessage func(*descriptorpb.DescriptorProto)
+	rewriteMessage = func(message *descriptorpb.DescriptorProto) {
+		for _, field := range message.Field {
+			if strings.HasPrefix(field.GetTypeName(), oldPrefix) {
+				field.TypeName = proto.String(newPrefix + strings.TrimPrefix(field.GetTypeName(), oldPrefix))
+			}
+		}
+		for _, nested := range message.NestedType {
+			rewriteMessage(nested)
+		}
+	}
+	for _, message := range file.MessageType {
+		rewriteMessage(message)
+	}
+	for _, service := range file.Service {
+		for _, method := range service.Method {
+			if strings.HasPrefix(method.GetInputType(), oldPrefix) {
+				method.InputType = proto.String(newPrefix + strings.TrimPrefix(method.GetInputType(), oldPrefix))
+			}
+			if strings.HasPrefix(method.GetOutputType(), oldPrefix) {
+				method.OutputType = proto.String(newPrefix + strings.TrimPrefix(method.GetOutputType(), oldPrefix))
+			}
+		}
+	}
 }

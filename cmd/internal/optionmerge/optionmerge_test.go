@@ -15,7 +15,7 @@ func TestMerge_Authn(t *testing.T) {
 		method     *authnpb.AuthnRule
 		hasMethod  bool
 		wantOK     bool
-		wantMode   authnpb.AuthnRule_Mode
+		wantMode   authnpb.AuthnMode
 		wantScheme string // first scheme, if any
 	}{
 		{
@@ -27,34 +27,34 @@ func TestMerge_Authn(t *testing.T) {
 		},
 		{
 			name:       "service default wins when no method rule",
-			svc:        &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_REQUIRED, Schemes: []string{"bearer"}},
+			svc:        &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_REQUIRED, Schemes: []string{"bearer"}},
 			method:     nil,
 			hasMethod:  false,
 			wantOK:     true,
-			wantMode:   authnpb.AuthnRule_MODE_REQUIRED,
+			wantMode:   authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 			wantScheme: "bearer",
 		},
 		{
 			name:       "method rule wins when mode is non-zero",
-			svc:        &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_REQUIRED, Schemes: []string{"bearer"}},
-			method:     &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_PUBLIC},
+			svc:        &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_REQUIRED, Schemes: []string{"bearer"}},
+			method:     &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_PUBLIC},
 			hasMethod:  true,
 			wantOK:     true,
-			wantMode:   authnpb.AuthnRule_MODE_PUBLIC,
+			wantMode:   authnpb.AuthnMode_AUTHN_MODE_PUBLIC,
 			wantScheme: "",
 		},
 		{
 			name:       "method with UNSPECIFIED mode inherits service default",
-			svc:        &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_REQUIRED, Schemes: []string{"mtls"}},
-			method:     &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_UNSPECIFIED},
+			svc:        &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_REQUIRED, Schemes: []string{"mtls"}},
+			method:     &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_UNSPECIFIED},
 			hasMethod:  true,
 			wantOK:     true,
-			wantMode:   authnpb.AuthnRule_MODE_REQUIRED,
+			wantMode:   authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 			wantScheme: "mtls",
 		},
 		{
 			name:      "service default with UNSPECIFIED mode returns false",
-			svc:       &authnpb.AuthnRule{Mode: authnpb.AuthnRule_MODE_UNSPECIFIED},
+			svc:       &authnpb.AuthnRule{Mode: authnpb.AuthnMode_AUTHN_MODE_UNSPECIFIED},
 			method:    nil,
 			hasMethod: false,
 			wantOK:    false,
@@ -202,7 +202,7 @@ func TestMerge_Audit(t *testing.T) {
 
 func TestMerge_DeepClone(t *testing.T) {
 	original := &authnpb.AuthnRule{
-		Mode:    authnpb.AuthnRule_MODE_REQUIRED,
+		Mode:    authnpb.AuthnMode_AUTHN_MODE_REQUIRED,
 		Schemes: []string{"bearer", "mtls"},
 	}
 	merged, ok := Merge[*authnpb.AuthnRule](nil, original, true)

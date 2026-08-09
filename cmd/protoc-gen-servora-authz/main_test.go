@@ -1,40 +1,17 @@
 package main
 
 import (
-	"sort"
 	"strings"
 	"testing"
 
 	authzpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/v1"
+	"github.com/Servora-Kit/servora/cmd/internal/plugintest"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 )
-
-// collectDeps walks the FileDescriptor's import closure (and the file itself)
-// in topological order, returning each unique file as a FileDescriptorProto.
-func collectDeps(fd protoreflect.FileDescriptor) []*descriptorpb.FileDescriptorProto {
-	seen := map[string]bool{}
-	var out []*descriptorpb.FileDescriptorProto
-
-	var visit func(f protoreflect.FileDescriptor)
-	visit = func(f protoreflect.FileDescriptor) {
-		if seen[f.Path()] {
-			return
-		}
-		seen[f.Path()] = true
-		imports := f.Imports()
-		for i := 0; i < imports.Len(); i++ {
-			visit(imports.Get(i).FileDescriptor)
-		}
-		out = append(out, protodesc.ToFileDescriptorProto(f))
-	}
-	visit(fd)
-	return out
-}
 
 type methodSpec struct {
 	name string
@@ -58,7 +35,7 @@ type fileSpec struct {
 func runPluginScenario(t *testing.T, files []fileSpec) (*protogen.Plugin, error) {
 	t.Helper()
 
-	deps := collectDeps(authzpb.File_servora_authz_v1_authz_proto)
+	deps := plugintest.DescriptorClosure(authzpb.File_servora_authz_v1_annotations_proto)
 
 	req := &pluginpb.CodeGeneratorRequest{
 		ProtoFile: deps,
@@ -87,7 +64,7 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 		Name:       proto.String(fs.name),
 		Package:    proto.String(fs.pkg),
 		Syntax:     proto.String(protoreflect.Proto3.String()),
-		Dependency: []string{"google/protobuf/descriptor.proto", "servora/authz/v1/authz.proto"},
+		Dependency: []string{"google/protobuf/descriptor.proto", "servora/authz/v1/annotations.proto"},
 		Options: &descriptorpb.FileOptions{
 			GoPackage: proto.String(fs.goPkg),
 		},
@@ -154,41 +131,6 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 	return fp
 }
 
-func generatedFiles(t *testing.T, gen *protogen.Plugin) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	for _, f := range gen.Response().File {
-		out[f.GetName()] = f.GetContent()
-	}
-	return out
-}
-
-func lookupAuthzFile(t *testing.T, files map[string]string) string {
-	t.Helper()
-	var matches []string
-	for k := range files {
-		if strings.HasSuffix(k, "/authz_rules.gen.go") || k == "authz_rules.gen.go" {
-			matches = append(matches, k)
-		}
-	}
-	if len(matches) == 0 {
-		t.Fatalf("expected an authz_rules.gen.go in output, got: %v", keysOf(files))
-	}
-	if len(matches) > 1 {
-		t.Fatalf("expected exactly one authz_rules.gen.go, got: %v", matches)
-	}
-	return files[matches[0]]
-}
-
-func keysOf[V any](m map[string]V) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	return ks
-}
-
 func TestNoAnnotations_NoFileGenerated(t *testing.T) {
 	gen, err := runPluginScenario(t, []fileSpec{
 		{
@@ -209,9 +151,9 @@ func TestNoAnnotations_NoFileGenerated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	if len(files) != 0 {
-		t.Fatalf("expected no generated files, got: %v", keysOf(files))
+		t.Fatalf("expected no generated files, got: %v", plugintest.SortedKeys(files))
 	}
 }
 
@@ -240,8 +182,8 @@ func TestMethodLevelCheck_GoesToOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthzFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authz_rules.gen.go")
 	if !strings.Contains(content, `"/example.v1.GreetingService/Hello"`) {
 		t.Fatalf("authz rule missing operation key\n--- generated ---\n%s", content)
 	}
@@ -280,8 +222,8 @@ func TestServiceDefault_MethodInherits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthzFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authz_rules.gen.go")
 	if !strings.Contains(content, `"/example.v1.GreetingService/Hello"`) {
 		t.Fatalf("inherited rule missing operation key\n--- generated ---\n%s", content)
 	}
@@ -325,8 +267,8 @@ func TestServiceDefault_MethodUnspecifiedInherits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthzFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authz_rules.gen.go")
 	if !strings.Contains(content, `"/example.v1.GreetingService/Hello"`) {
 		t.Fatalf("inherited rule missing operation key\n--- generated ---\n%s", content)
 	}
@@ -369,8 +311,8 @@ func TestMethodOverridesServiceDefault_NoneWins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
-	content := lookupAuthzFile(t, files)
+	files := plugintest.ResponseFiles(gen)
+	content := plugintest.OnlyGeneratedFile(t, files, "authz_rules.gen.go")
 
 	// Hello should be CHECK (inherited).
 	if !strings.Contains(content, `"/example.v1.GreetingService/Hello"`) {
@@ -443,11 +385,11 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
 
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	accounts := files["example.com/gen/accounts/v1/authz_rules.gen.go"]
 	admin := files["example.com/gen/admin/v1/authz_rules.gen.go"]
 	if accounts == "" || admin == "" {
-		t.Fatalf("expected generated authz files for both packages, got: %v", keysOf(files))
+		t.Fatalf("expected generated authz files for both packages, got: %v", plugintest.SortedKeys(files))
 	}
 	if !strings.Contains(accounts, `"/accounts.v1.UserService/Get"`) {
 		t.Fatalf("accounts rule missing full-name operation\n--- generated ---\n%s", accounts)
@@ -496,9 +438,9 @@ func TestServiceDefault_NoMethodsDeclared_NoOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	if len(files) != 0 {
-		t.Fatalf("expected no generated files for service with no methods, got: %v", keysOf(files))
+		t.Fatalf("expected no generated files for service with no methods, got: %v", plugintest.SortedKeys(files))
 	}
 }
 
@@ -552,5 +494,51 @@ func TestCheckRuleValidation(t *testing.T) {
 				t.Fatalf("error = %v, want operation and %q", err, tt.message)
 			}
 		})
+	}
+}
+
+func TestGeneratedFileCompiles(t *testing.T) {
+	gen, err := runPluginScenario(t, []fileSpec{{
+		name:     "example/v1/greeting.proto",
+		pkg:      "example.v1",
+		goPkg:    "example.com/gen/example/v1;examplev1",
+		generate: true,
+		services: []serviceSpec{{
+			name: "GreetingService",
+			serviceDefault: &authzpb.AuthzRule{
+				Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+				Action:          "read",
+				ResourceType:    "greeting",
+				ResourceIdField: "id",
+			},
+			methods: []methodSpec{
+				{name: "Get"},
+				{name: "Healthz", rule: &authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_NONE}},
+			},
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	source := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "authz_rules.gen.go")
+	plugintest.AssertGeneratedGoCompiles(t, source, "examplev1")
+}
+
+func TestUnknownModeRejected(t *testing.T) {
+	_, err := runPluginScenario(t, []fileSpec{{
+		name:     "example/v1/bad.proto",
+		pkg:      "example.v1",
+		goPkg:    "example.com/gen/example/v1;examplev1",
+		generate: true,
+		services: []serviceSpec{{
+			name: "BadService",
+			methods: []methodSpec{{
+				name: "BadOp",
+				rule: &authzpb.AuthzRule{Mode: authzpb.AuthzMode(99)},
+			}},
+		}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "unknown AuthzMode 99") {
+		t.Fatalf("generate error = %v, want unknown AuthzMode", err)
 	}
 }

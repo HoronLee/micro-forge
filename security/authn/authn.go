@@ -207,7 +207,7 @@ func compileAuthnRules(rules map[string]*authnpb.AuthnRule, entries []compiledAu
 				panic(fmt.Sprintf("authn: operation %q references unknown scheme %q", operation, scheme))
 			}
 		}
-		if rule.GetMode() == authnpb.AuthnRule_MODE_PUBLIC {
+		if rule.GetMode() == authnpb.AuthnMode_AUTHN_MODE_PUBLIC {
 			compiled[operation] = compiledRule{public: true}
 			continue
 		}

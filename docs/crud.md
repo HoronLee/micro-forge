@@ -73,6 +73,8 @@ message User {
 
 客户端可写的 singular scalar 应使用 explicit presence。这样框架可以区分“未提供”“Set 零值”和 FieldMask 选中但值 absent 的 Clear。
 
+`protoc-gen-servora-crud` 在扫描资源前校验 `target`，只接受 `go` 或 `ts`。资源 pattern 的 `{variable}` 必须是 ASCII Proto identifier（`[A-Za-z_][A-Za-z0-9_]*`）；同一 pattern 内变量不得重复；同一资源的多个 pattern 也不得包含会生成相同 Go exported identifier 的不同变量，例如 `foo_bar` 与 `fooBar`。违反这些约束会在生成阶段返回包含资源 full name、pattern 或冲突变量的确定性诊断。
+
 生成链：
 
 ```bash

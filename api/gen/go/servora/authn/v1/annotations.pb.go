@@ -22,64 +22,64 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Mode 表达认证模式三态。
-type AuthnRule_Mode int32
+// AuthnMode 表达认证模式三态。
+type AuthnMode int32
 
 const (
-	// 未指定，等价"未写注解"：私有 + 框架默认引擎（fail-closed 默认）。
-	AuthnRule_MODE_UNSPECIFIED AuthnRule_Mode = 0
+	// 未指定，等价“未写注解”：私有 + 框架默认引擎（fail-closed 默认）。
+	AuthnMode_AUTHN_MODE_UNSPECIFIED AuthnMode = 0
 	// 显式公开。schemes 必须为空。
-	AuthnRule_MODE_PUBLIC AuthnRule_Mode = 1
+	AuthnMode_AUTHN_MODE_PUBLIC AuthnMode = 1
 	// 必须用 schemes 指定的认证机制。schemes 必须非空。
-	AuthnRule_MODE_REQUIRED AuthnRule_Mode = 2
+	AuthnMode_AUTHN_MODE_REQUIRED AuthnMode = 2
 )
 
-// Enum value maps for AuthnRule_Mode.
+// Enum value maps for AuthnMode.
 var (
-	AuthnRule_Mode_name = map[int32]string{
-		0: "MODE_UNSPECIFIED",
-		1: "MODE_PUBLIC",
-		2: "MODE_REQUIRED",
+	AuthnMode_name = map[int32]string{
+		0: "AUTHN_MODE_UNSPECIFIED",
+		1: "AUTHN_MODE_PUBLIC",
+		2: "AUTHN_MODE_REQUIRED",
 	}
-	AuthnRule_Mode_value = map[string]int32{
-		"MODE_UNSPECIFIED": 0,
-		"MODE_PUBLIC":      1,
-		"MODE_REQUIRED":    2,
+	AuthnMode_value = map[string]int32{
+		"AUTHN_MODE_UNSPECIFIED": 0,
+		"AUTHN_MODE_PUBLIC":      1,
+		"AUTHN_MODE_REQUIRED":    2,
 	}
 )
 
-func (x AuthnRule_Mode) Enum() *AuthnRule_Mode {
-	p := new(AuthnRule_Mode)
+func (x AuthnMode) Enum() *AuthnMode {
+	p := new(AuthnMode)
 	*p = x
 	return p
 }
 
-func (x AuthnRule_Mode) String() string {
+func (x AuthnMode) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (AuthnRule_Mode) Descriptor() protoreflect.EnumDescriptor {
+func (AuthnMode) Descriptor() protoreflect.EnumDescriptor {
 	return file_servora_authn_v1_annotations_proto_enumTypes[0].Descriptor()
 }
 
-func (AuthnRule_Mode) Type() protoreflect.EnumType {
+func (AuthnMode) Type() protoreflect.EnumType {
 	return &file_servora_authn_v1_annotations_proto_enumTypes[0]
 }
 
-func (x AuthnRule_Mode) Number() protoreflect.EnumNumber {
+func (x AuthnMode) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use AuthnRule_Mode.Descriptor instead.
-func (AuthnRule_Mode) EnumDescriptor() ([]byte, []int) {
-	return file_servora_authn_v1_annotations_proto_rawDescGZIP(), []int{0, 0}
+// Deprecated: Use AuthnMode.Descriptor instead.
+func (AuthnMode) EnumDescriptor() ([]byte, []int) {
+	return file_servora_authn_v1_annotations_proto_rawDescGZIP(), []int{0}
 }
 
 // AuthnRule 声明 RPC 方法的认证策略。
 type AuthnRule struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 认证模式。
-	Mode AuthnRule_Mode `protobuf:"varint,1,opt,name=mode,proto3,enum=servora.authn.v1.AuthnRule_Mode" json:"mode,omitempty"`
+	Mode AuthnMode `protobuf:"varint,1,opt,name=mode,proto3,enum=servora.authn.v1.AuthnMode" json:"mode,omitempty"`
 	// 接受的认证机制；空列表表示沿用框架默认引擎。
 	// 取值是各 wrapper 子包持有的私有 method 字符串常量（如 `jwt`、`mtls`、`api_key`、`aksk`）；
 	// framework 不枚举这些值，业务自定义引擎也可填任意字符串。
@@ -119,11 +119,11 @@ func (*AuthnRule) Descriptor() ([]byte, []int) {
 	return file_servora_authn_v1_annotations_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *AuthnRule) GetMode() AuthnRule_Mode {
+func (x *AuthnRule) GetMode() AuthnMode {
 	if x != nil {
 		return x.Mode
 	}
-	return AuthnRule_MODE_UNSPECIFIED
+	return AuthnMode_AUTHN_MODE_UNSPECIFIED
 }
 
 func (x *AuthnRule) GetSchemes() []string {
@@ -168,14 +168,14 @@ var File_servora_authn_v1_annotations_proto protoreflect.FileDescriptor
 
 const file_servora_authn_v1_annotations_proto_rawDesc = "" +
 	"\n" +
-	"\"servora/authn/v1/annotations.proto\x12\x10servora.authn.v1\x1a google/protobuf/descriptor.proto\"\x9d\x01\n" +
-	"\tAuthnRule\x124\n" +
-	"\x04mode\x18\x01 \x01(\x0e2 .servora.authn.v1.AuthnRule.ModeR\x04mode\x12\x18\n" +
-	"\aschemes\x18\x02 \x03(\tR\aschemes\"@\n" +
-	"\x04Mode\x12\x14\n" +
-	"\x10MODE_UNSPECIFIED\x10\x00\x12\x0f\n" +
-	"\vMODE_PUBLIC\x10\x01\x12\x11\n" +
-	"\rMODE_REQUIRED\x10\x02:g\n" +
+	"\"servora/authn/v1/annotations.proto\x12\x10servora.authn.v1\x1a google/protobuf/descriptor.proto\"V\n" +
+	"\tAuthnRule\x12/\n" +
+	"\x04mode\x18\x01 \x01(\x0e2\x1b.servora.authn.v1.AuthnModeR\x04mode\x12\x18\n" +
+	"\aschemes\x18\x02 \x03(\tR\aschemes*W\n" +
+	"\tAuthnMode\x12\x1a\n" +
+	"\x16AUTHN_MODE_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11AUTHN_MODE_PUBLIC\x10\x01\x12\x17\n" +
+	"\x13AUTHN_MODE_REQUIRED\x10\x02:g\n" +
 	"\x0fservice_default\x12\x1f.google.protobuf.ServiceOptions\x18\xfd\x88\x03 \x01(\v2\x1b.servora.authn.v1.AuthnRuleR\x0eserviceDefault:Q\n" +
 	"\x04rule\x12\x1e.google.protobuf.MethodOptions\x18\xfc\x88\x03 \x01(\v2\x1b.servora.authn.v1.AuthnRuleR\x04ruleBDZBgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/v1;authnpbb\x06proto3"
 
@@ -194,13 +194,13 @@ func file_servora_authn_v1_annotations_proto_rawDescGZIP() []byte {
 var file_servora_authn_v1_annotations_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_servora_authn_v1_annotations_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_servora_authn_v1_annotations_proto_goTypes = []any{
-	(AuthnRule_Mode)(0),                 // 0: servora.authn.v1.AuthnRule.Mode
+	(AuthnMode)(0),                      // 0: servora.authn.v1.AuthnMode
 	(*AuthnRule)(nil),                   // 1: servora.authn.v1.AuthnRule
 	(*descriptorpb.ServiceOptions)(nil), // 2: google.protobuf.ServiceOptions
 	(*descriptorpb.MethodOptions)(nil),  // 3: google.protobuf.MethodOptions
 }
 var file_servora_authn_v1_annotations_proto_depIdxs = []int32{
-	0, // 0: servora.authn.v1.AuthnRule.mode:type_name -> servora.authn.v1.AuthnRule.Mode
+	0, // 0: servora.authn.v1.AuthnRule.mode:type_name -> servora.authn.v1.AuthnMode
 	2, // 1: servora.authn.v1.service_default:extendee -> google.protobuf.ServiceOptions
 	3, // 2: servora.authn.v1.rule:extendee -> google.protobuf.MethodOptions
 	1, // 3: servora.authn.v1.service_default:type_name -> servora.authn.v1.AuthnRule

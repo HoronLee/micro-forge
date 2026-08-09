@@ -16,7 +16,6 @@ type resourceInfo struct {
 	file       *protogen.File
 	message    *protogen.Message
 	descriptor *annotations.ResourceDescriptor
-	identifier *protogen.Field
 	patterns   []namePattern
 	variables  []string
 	fields     []resourceField
@@ -102,6 +101,10 @@ func buildResourceInfo(
 	patterns := make([]namePattern, len(descriptor.GetPattern()))
 	skeletons := make(map[string]string, len(patterns))
 	variableSet := make(map[string]struct{})
+	goVariables := make(map[string]struct {
+		variable string
+		pattern  string
+	})
 	var variables []string
 	for index, raw := range descriptor.GetPattern() {
 		pattern, err := parseNamePattern(raw)
@@ -115,6 +118,17 @@ func buildResourceInfo(
 		skeletons[skeleton] = raw
 		patterns[index] = pattern
 		for _, variable := range pattern.variables {
+			goName := goExportedName(variable)
+			if previous, collision := goVariables[goName]; collision && previous.variable != variable {
+				return nil, fmt.Errorf(
+					"crud: resource %s patterns %q and %q use variables %q and %q both generate Go identifier %q",
+					fullName, previous.pattern, raw, previous.variable, variable, goName,
+				)
+			}
+			goVariables[goName] = struct {
+				variable string
+				pattern  string
+			}{variable: variable, pattern: raw}
 			if _, seen := variableSet[variable]; seen {
 				continue
 			}
@@ -133,7 +147,7 @@ func buildResourceInfo(
 		}
 	}
 	return &resourceInfo{
-		file: file, message: message, descriptor: descriptor, identifier: identifier,
+		file: file, message: message, descriptor: descriptor,
 		patterns: patterns, variables: variables, fields: fields, writable: writable,
 	}, nil
 }
@@ -153,6 +167,7 @@ func parseNamePattern(raw string) (namePattern, error) {
 	}
 	parts := strings.Split(raw, "/")
 	pattern := namePattern{raw: raw, segments: make([]nameSegment, len(parts))}
+	seenVariables := make(map[string]struct{})
 	var fixed []string
 	for index, part := range parts {
 		if part == "" {
@@ -164,8 +179,12 @@ func parseNamePattern(raw string) (namePattern, error) {
 			}
 			variable := part[1 : len(part)-1]
 			if !validProtoIdentifier(variable) {
-				return namePattern{}, fmt.Errorf("variable %q is not a protobuf identifier", variable)
+				return namePattern{}, fmt.Errorf("variable %q is not a protobuf ASCII identifier", variable)
 			}
+			if _, duplicate := seenVariables[variable]; duplicate {
+				return namePattern{}, fmt.Errorf("variable %q is repeated", variable)
+			}
+			seenVariables[variable] = struct{}{}
 			pattern.segments[index].variable = variable
 			pattern.variables = append(pattern.variables, variable)
 			continue
@@ -210,55 +229,34 @@ func patternSkeleton(pattern namePattern) string {
 }
 
 func validProtoIdentifier(value string) bool {
-	for index, character := range value {
-		if index == 0 {
-			if character != '_' && !unicode.IsLetter(character) {
-				return false
-			}
-			continue
-		}
-		if character != '_' && !unicode.IsLetter(character) && !unicode.IsDigit(character) {
+	if value == "" || !isProtoIdentifierStart(value[0]) {
+		return false
+	}
+	for index := 1; index < len(value); index++ {
+		character := value[index]
+		if !isProtoIdentifierStart(character) && (character < '0' || character > '9') {
 			return false
 		}
 	}
-	return value != ""
+	return true
+}
+
+func isProtoIdentifierStart(character byte) bool {
+	return character == '_' || character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z'
 }
 
 func collectResourceFields(message *protogen.Message) ([]resourceField, error) {
 	var fields []resourceField
 	bySymbol := make(map[string]string)
-	var collision error
-	var visit func(current *protogen.Message, prefix, symbolPrefix string, ancestors map[protoreflect.FullName]bool)
-	visit = func(current *protogen.Message, prefix, symbolPrefix string, ancestors map[protoreflect.FullName]bool) {
-		if collision != nil || ancestors[current.Desc.FullName()] {
-			return
+	err := walkMessageFields(message, func(walked walkedField) (bool, error) {
+		if previous, exists := bySymbol[walked.Symbol]; exists {
+			return false, fmt.Errorf("generated field symbol %s collides for %s and %s", walked.Symbol, previous, walked.Path)
 		}
-		nextAncestors := make(map[protoreflect.FullName]bool, len(ancestors)+1)
-		for name := range ancestors {
-			nextAncestors[name] = true
-		}
-		nextAncestors[current.Desc.FullName()] = true
-		for _, field := range current.Fields {
-			path := string(field.Desc.Name())
-			if prefix != "" {
-				path = prefix + "." + path
-			}
-			symbol := symbolPrefix + goExportedName(string(field.Desc.Name()))
-			if previous, exists := bySymbol[symbol]; exists {
-				collision = fmt.Errorf("generated field symbol %s collides for %s and %s", symbol, previous, path)
-				return
-			}
-			bySymbol[symbol] = path
-			fields = append(fields, resourceField{path: path, symbol: symbol, field: field})
-			if field.Message == nil || field.Desc.IsList() || field.Desc.IsMap() || strings.HasPrefix(string(field.Message.Desc.FullName()), "google.protobuf.") {
-				continue
-			}
-			visit(field.Message, path, symbol, nextAncestors)
-		}
-	}
-	visit(message, "", "", map[protoreflect.FullName]bool{})
-	return fields, collision
-
+		bySymbol[walked.Symbol] = walked.Path
+		fields = append(fields, resourceField{path: walked.Path, symbol: walked.Symbol, field: walked.Field})
+		return true, nil
+	})
+	return fields, err
 }
 
 func hasBehavior(field protoreflect.FieldDescriptor, wanted annotations.FieldBehavior) bool {

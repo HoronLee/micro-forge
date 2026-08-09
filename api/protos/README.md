@@ -31,9 +31,9 @@ Proto files are organized in these top-level groups under `servora/`:
 | `servora.security.tls.v1` | Shared TLS configuration referenced by core server/client endpoint config and consumed by `security/tls`. |
 | `servora.security.jwt.v1` | JWT issuer / verifier configuration, including generated defaults for `access_expire=3600` and `refresh_expire=604800`. |
 | `servora.contrib.openfga.v1` | OpenFGA official SDK construction config; section key `openfga` (optional), generated required checks for `api_url` / `store_id`. |
-| `servora.audit.v1` | Audit annotation extensions for `protoc-gen-servora-audit` (extension `5010x`, supports service-level `service_default` + three-state `AuditMode`; `AuditRule` only carries the RPC audit on/off switch). |
-| `servora.authz.v1` | Authorization annotation extensions for `protoc-gen-servora-authz` (extension `5020x`, supports service-level `service_default`). |
-| `servora.authn.v1` | Authentication annotation extensions for `protoc-gen-servora-authn` (extension `5030x`, supports service-level `service_default` + `schemes` / `credentials_locations` fields). |
+| `servora.audit.v1` | `servora/audit/v1/annotations.proto` 中的审计注解；供 `protoc-gen-servora-audit` 使用（extension `5010x`，支持 service-level `service_default` + 三态 `AuditMode`；`AuditRule` 只携带 RPC audit 开关）。 |
+| `servora.authz.v1` | `servora/authz/v1/annotations.proto` 中的授权注解；供 `protoc-gen-servora-authz` 使用（extension `5020x`，支持 service-level `service_default`）。 |
+| `servora.authn.v1` | `servora/authn/v1/annotations.proto` 中的认证注解；供 `protoc-gen-servora-authn` 使用（extension `5030x`，顶层 `AuthnMode` 使用 `AUTHN_MODE_*` 值，`AuthnRule` 支持 service-level `service_default` 与 `schemes`）。 |
 
 ## Loading configuration in business services
 

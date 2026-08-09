@@ -3,44 +3,20 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 
 	auditv1 "github.com/Servora-Kit/servora/api/gen/go/servora/audit/v1"
+	"github.com/Servora-Kit/servora/cmd/internal/plugintest"
 	"github.com/bufbuild/protocompile"
 	"github.com/bufbuild/protocompile/wellknownimports"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 )
-
-// collectDeps walks the FileDescriptor's import closure (and the file itself)
-// in topological order, returning each unique file as a FileDescriptorProto.
-func collectDeps(fd protoreflect.FileDescriptor) []*descriptorpb.FileDescriptorProto {
-	seen := map[string]bool{}
-	var out []*descriptorpb.FileDescriptorProto
-
-	var visit func(f protoreflect.FileDescriptor)
-	visit = func(f protoreflect.FileDescriptor) {
-		if seen[f.Path()] {
-			return
-		}
-		seen[f.Path()] = true
-		imports := f.Imports()
-		for i := 0; i < imports.Len(); i++ {
-			visit(imports.Get(i).FileDescriptor)
-		}
-		out = append(out, protodesc.ToFileDescriptorProto(f))
-	}
-	visit(fd)
-	_ = protoregistry.GlobalFiles
-	return out
-}
 
 // methodSpec describes a single RPC entry to materialize on a fake service.
 type methodSpec struct {
@@ -69,7 +45,7 @@ type fileSpec struct {
 func runPluginScenario(t *testing.T, files []fileSpec) (*protogen.Plugin, error) {
 	t.Helper()
 
-	deps := collectDeps(auditv1.File_servora_audit_v1_annotations_proto)
+	deps := plugintest.DescriptorClosure(auditv1.File_servora_audit_v1_annotations_proto)
 
 	req := &pluginpb.CodeGeneratorRequest{
 		ProtoFile: deps,
@@ -133,41 +109,6 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 	return fp
 }
 
-func generatedFiles(t *testing.T, gen *protogen.Plugin) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	for _, f := range gen.Response().File {
-		out[f.GetName()] = f.GetContent()
-	}
-	return out
-}
-
-func lookupAuditFile(t *testing.T, files map[string]string) string {
-	t.Helper()
-	var matches []string
-	for k := range files {
-		if strings.HasSuffix(k, "/audit_rules.gen.go") || k == "audit_rules.gen.go" {
-			matches = append(matches, k)
-		}
-	}
-	if len(matches) == 0 {
-		t.Fatalf("expected an audit_rules.gen.go in output, got: %v", keysOf(files))
-	}
-	if len(matches) > 1 {
-		t.Fatalf("expected exactly one audit_rules.gen.go, got: %v", matches)
-	}
-	return files[matches[0]]
-}
-
-func keysOf[V any](m map[string]V) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	return ks
-}
-
 func TestMethodExtensionContract(t *testing.T) {
 	desc := auditv1.E_Rule.TypeDescriptor()
 	if got, want := desc.FullName(), protoreflect.FullName("servora.audit.v1.rule"); got != want {
@@ -186,15 +127,28 @@ func TestLegacyMethodOptionRejectedByCompiler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read audit annotations proto: %v", err)
 	}
-	legacy, err := os.ReadFile(filepath.Join("testdata", "legacy_audit_rule.proto"))
-	if err != nil {
-		t.Fatalf("read legacy fixture: %v", err)
-	}
+	const legacy = `syntax = "proto3";
+
+package legacy.v1;
+
+import "servora/audit/v1/annotations.proto";
+
+option go_package = "example.com/legacy/v1;legacyv1";
+
+message Request {}
+message Response {}
+
+service LegacyAuditService {
+  rpc Call(Request) returns (Response) {
+    option (servora.audit.v1.audit_rule) = {mode: AUDIT_MODE_ENABLED};
+  }
+}
+`
 
 	resolver := &protocompile.SourceResolver{
 		Accessor: protocompile.SourceAccessorFromMap(map[string]string{
 			"servora/audit/v1/annotations.proto": string(annotations),
-			"legacy/v1/legacy.proto":             string(legacy),
+			"legacy/v1/legacy.proto":             legacy,
 		}),
 	}
 	compiler := protocompile.Compiler{
@@ -229,9 +183,9 @@ func TestNoAnnotations_NoFileGenerated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	if len(files) != 0 {
-		t.Fatalf("expected no generated files, got: %v", keysOf(files))
+		t.Fatalf("expected no generated files, got: %v", plugintest.SortedKeys(files))
 	}
 }
 
@@ -257,7 +211,7 @@ func TestMethodLevelEnabled_GoesToOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	content := lookupAuditFile(t, generatedFiles(t, gen))
+	content := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
 
 	// Must contain the operation key.
 	wantOp := `"/example.v1.GreetingService/Hello"`
@@ -303,9 +257,9 @@ func TestMethodLevelDisabled_NotEmitted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	if len(files) != 0 {
-		t.Fatalf("expected no generated files for DISABLED rule, got: %v", keysOf(files))
+		t.Fatalf("expected no generated files for DISABLED rule, got: %v", plugintest.SortedKeys(files))
 	}
 }
 
@@ -334,7 +288,7 @@ func TestServiceDefault_MethodInherits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	content := lookupAuditFile(t, generatedFiles(t, gen))
+	content := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
 	wantKey := `"/example.v1.GreetingService/Hello"`
 	if !strings.Contains(content, wantKey) {
 		t.Fatalf("inherited rule missing operation key %s\n--- generated ---\n%s", wantKey, content)
@@ -366,7 +320,7 @@ func TestServiceDefault_MethodUnspecifiedInherits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	content := lookupAuditFile(t, generatedFiles(t, gen))
+	content := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
 	if !strings.Contains(content, `"/example.v1.GreetingService/Hello"`) {
 		t.Fatalf("expected operation entry for inherited method\n--- generated ---\n%s", content)
 	}
@@ -398,7 +352,7 @@ func TestMethodOverridesServiceDefault_DisabledWins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	content := lookupAuditFile(t, generatedFiles(t, gen))
+	content := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
 	if !strings.Contains(content, `"/example.v1.GreetingService/Hello"`) {
 		t.Errorf("Hello should appear (inherits ENABLED)\n--- generated ---\n%s", content)
 	}
@@ -444,13 +398,13 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
 
-	files := generatedFiles(t, gen)
+	files := plugintest.ResponseFiles(gen)
 	accounts := files["example.com/gen/accounts/v1/audit_rules.gen.go"]
 	if accounts == "" {
-		t.Fatalf("expected generated audit file for accounts package, got: %v", keysOf(files))
+		t.Fatalf("expected generated audit file for accounts package, got: %v", plugintest.SortedKeys(files))
 	}
 	if _, ok := files["example.com/gen/admin/v1/audit_rules.gen.go"]; ok {
-		t.Fatalf("admin service is disabled and must not emit rules, got files: %v", keysOf(files))
+		t.Fatalf("admin service is disabled and must not emit rules, got files: %v", plugintest.SortedKeys(files))
 	}
 	if !strings.Contains(accounts, `"/accounts.v1.UserService/Get"`) {
 		t.Fatalf("accounts rule missing full-name operation\n--- generated ---\n%s", accounts)
@@ -484,7 +438,7 @@ func TestMultipleMethods_AllEnabledPresent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	content := lookupAuditFile(t, generatedFiles(t, gen))
+	content := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
 	for _, op := range []string{
 		`"/example.v1.SvcA/Create"`,
 		`"/example.v1.SvcA/Delete"`,
@@ -518,11 +472,35 @@ func TestGeneratedFile_HasCorrectHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate returned unexpected error: %v", err)
 	}
-	content := lookupAuditFile(t, generatedFiles(t, gen))
+	content := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
 	if !strings.Contains(content, "Code generated by protoc-gen-servora-audit") {
 		t.Errorf("missing generated-code header\n--- generated ---\n%s", content)
 	}
 	if !strings.Contains(content, "DO NOT EDIT") {
 		t.Errorf("missing DO NOT EDIT marker\n--- generated ---\n%s", content)
 	}
+}
+
+func TestGeneratedFileCompiles(t *testing.T) {
+	gen, err := runPluginScenario(t, []fileSpec{{
+		name:     "example/v1/svc.proto",
+		pkg:      "example.v1",
+		goPkg:    "example.com/gen/example/v1;examplev1",
+		generate: true,
+		services: []serviceSpec{{
+			name: "Service",
+			serviceDefault: &auditv1.AuditRule{
+				Mode: auditv1.AuditMode_AUDIT_MODE_ENABLED,
+			},
+			methods: []methodSpec{
+				{name: "Create"},
+				{name: "Healthz", rule: &auditv1.AuditRule{Mode: auditv1.AuditMode_AUDIT_MODE_DISABLED}},
+			},
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	source := plugintest.OnlyGeneratedFile(t, plugintest.ResponseFiles(gen), "audit_rules.gen.go")
+	plugintest.AssertGeneratedGoCompiles(t, source, "examplev1")
 }
