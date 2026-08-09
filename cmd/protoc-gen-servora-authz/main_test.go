@@ -116,8 +116,40 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 		fp.Service = append(fp.Service, sp)
 	}
 
-	emptyMsg := &descriptorpb.DescriptorProto{Name: proto.String("Empty")}
-	fp.MessageType = append(fp.MessageType, emptyMsg)
+	emptyMsg := &descriptorpb.DescriptorProto{
+		Name: proto.String("Empty"),
+		Field: []*descriptorpb.FieldDescriptorProto{
+			{
+				Name:   proto.String("id"),
+				Number: proto.Int32(1),
+				Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+			},
+			{
+				Name:     proto.String("nested"),
+				Number:   proto.Int32(2),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String("." + fs.pkg + ".Nested"),
+			},
+			{
+				Name:   proto.String("tags"),
+				Number: proto.Int32(3),
+				Label:  descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+				Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+			},
+		},
+	}
+	nestedMsg := &descriptorpb.DescriptorProto{
+		Name: proto.String("Nested"),
+		Field: []*descriptorpb.FieldDescriptorProto{{
+			Name:   proto.String("id"),
+			Number: proto.Int32(1),
+			Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+			Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+		}},
+	}
+	fp.MessageType = append(fp.MessageType, emptyMsg, nestedMsg)
 
 	return fp
 }
@@ -195,9 +227,10 @@ func TestMethodLevelCheck_GoesToOutput(t *testing.T) {
 					name: "GreetingService",
 					methods: []methodSpec{
 						{name: "Hello", rule: &authzpb.AuthzRule{
-							Mode:         authzpb.AuthzMode_AUTHZ_MODE_CHECK,
-							Action:       "user",
-							ResourceType: "greeting",
+							Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+							Action:          "user",
+							ResourceType:    "greeting",
+							ResourceIdField: "id",
 						}},
 					},
 				},
@@ -232,9 +265,10 @@ func TestServiceDefault_MethodInherits(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authzpb.AuthzRule{
-						Mode:         authzpb.AuthzMode_AUTHZ_MODE_CHECK,
-						Action:       "user",
-						ResourceType: "greeting",
+						Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+						Action:          "user",
+						ResourceType:    "greeting",
+						ResourceIdField: "id",
 					},
 					methods: []methodSpec{
 						{name: "Hello"}, // no method-level rule → inherits CHECK
@@ -272,9 +306,10 @@ func TestServiceDefault_MethodUnspecifiedInherits(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authzpb.AuthzRule{
-						Mode:         authzpb.AuthzMode_AUTHZ_MODE_CHECK,
-						Action:       "user",
-						ResourceType: "greeting",
+						Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+						Action:          "user",
+						ResourceType:    "greeting",
+						ResourceIdField: "id",
 					},
 					methods: []methodSpec{
 						{name: "Hello", rule: &authzpb.AuthzRule{
@@ -316,9 +351,10 @@ func TestMethodOverridesServiceDefault_NoneWins(t *testing.T) {
 				{
 					name: "GreetingService",
 					serviceDefault: &authzpb.AuthzRule{
-						Mode:         authzpb.AuthzMode_AUTHZ_MODE_CHECK,
-						Action:       "user",
-						ResourceType: "greeting",
+						Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+						Action:          "user",
+						ResourceType:    "greeting",
+						ResourceIdField: "id",
 					},
 					methods: []methodSpec{
 						{name: "Hello"}, // inherits CHECK
@@ -375,9 +411,10 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 				{
 					name: "UserService",
 					serviceDefault: &authzpb.AuthzRule{
-						Mode:         authzpb.AuthzMode_AUTHZ_MODE_CHECK,
-						Action:       "read",
-						ResourceType: "account_user",
+						Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+						Action:          "read",
+						ResourceType:    "account_user",
+						ResourceIdField: "id",
 					},
 					methods: []methodSpec{{name: "Get"}},
 				},
@@ -392,9 +429,10 @@ func TestSameShortServiceNameAcrossPackages_DoesNotShareRules(t *testing.T) {
 				{
 					name: "UserService",
 					serviceDefault: &authzpb.AuthzRule{
-						Mode:         authzpb.AuthzMode_AUTHZ_MODE_CHECK,
-						Action:       "admin_read",
-						ResourceType: "admin_user",
+						Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+						Action:          "admin_read",
+						ResourceType:    "admin_user",
+						ResourceIdField: "id",
 					},
 					methods: []methodSpec{{name: "Get"}},
 				},
@@ -461,5 +499,58 @@ func TestServiceDefault_NoMethodsDeclared_NoOutput(t *testing.T) {
 	files := generatedFiles(t, gen)
 	if len(files) != 0 {
 		t.Fatalf("expected no generated files for service with no methods, got: %v", keysOf(files))
+	}
+}
+
+func TestCheckRuleValidation(t *testing.T) {
+	validRule := func() *authzpb.AuthzRule {
+		return &authzpb.AuthzRule{
+			Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+			Action:          "read",
+			ResourceType:    "document",
+			ResourceIdField: "nested.id",
+		}
+	}
+	run := func(t *testing.T, rule *authzpb.AuthzRule) error {
+		t.Helper()
+		_, err := runPluginScenario(t, []fileSpec{{
+			name:     "example/v1/resource.proto",
+			pkg:      "example.v1",
+			goPkg:    "example.com/gen/example/v1;examplev1",
+			generate: true,
+			services: []serviceSpec{{
+				name:    "ResourceService",
+				methods: []methodSpec{{name: "Get", rule: rule}},
+			}},
+		}})
+		return err
+	}
+
+	if err := run(t, validRule()); err != nil {
+		t.Fatalf("valid nested rule: %v", err)
+	}
+	tests := []struct {
+		name    string
+		mutate  func(*authzpb.AuthzRule)
+		message string
+	}{
+		{name: "missing action", mutate: func(rule *authzpb.AuthzRule) { rule.Action = "" }, message: "requires action"},
+		{name: "missing resource type", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceType = "" }, message: "requires resource_type"},
+		{name: "missing resource id field", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceIdField = "" }, message: "requires resource_id_field"},
+		{name: "unknown field", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceIdField = "missing" }, message: "not found"},
+		{name: "repeated field", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceIdField = "tags" }, message: "repeated or map"},
+		{name: "scalar intermediate", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceIdField = "id.value" }, message: "not a message"},
+		{name: "message terminal", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceIdField = "nested" }, message: "terminates on a message"},
+		{name: "resource id field whitespace", mutate: func(rule *authzpb.AuthzRule) { rule.ResourceIdField = " nested.id " }, message: "leading or trailing whitespace"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rule := validRule()
+			tt.mutate(rule)
+			err := run(t, rule)
+			if err == nil || !strings.Contains(err.Error(), tt.message) || !strings.Contains(err.Error(), "/example.v1.ResourceService/Get") {
+				t.Fatalf("error = %v, want operation and %q", err, tt.message)
+			}
+		})
 	}
 }

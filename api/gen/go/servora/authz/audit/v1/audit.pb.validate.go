@@ -59,19 +59,17 @@ func (m *AuthzDecision) validate(all bool) error {
 
 	// no validation rules for Decision
 
+	// no validation rules for Subject
+
 	// no validation rules for Action
 
 	// no validation rules for ResourceType
 
 	// no validation rules for ResourceId
 
-	// no validation rules for Backend
-
 	// no validation rules for Reason
 
 	// no validation rules for Code
-
-	// no validation rules for Message
 
 	if len(errors) > 0 {
 		return AuthzDecisionMultiError(errors)

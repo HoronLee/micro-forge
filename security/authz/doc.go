@@ -2,27 +2,26 @@
 //
 // # Engine model
 //
-// The Authorizer interface exposes a single Check method that accepts a
-// CheckRequest (Subject, Action, ResourceType, ResourceID, Attributes).
+// The Authorizer interface exposes a single Check method that accepts an
+// engine-neutral CheckRequest with Subject, Action, Resource, and Attributes.
 // Any authorization backend — OpenFGA, SpiceDB, Cedar, OPA, or custom —
 // can implement this interface.
 //
-// Batch and list capabilities are available via optional sub-interfaces in
-// the batch and lister sub-packages, which engines may implement as needed.
+// Batch and list capabilities are available through the root BatchAuthorizer
+// and Lister interfaces, which engines may implement as needed.
 //
 // # Subject resolution
 //
-// The middleware does NOT assume how a subject string is derived from the
-// request context. Callers provide a WithSubjectFunc option that extracts
-// the subject from ctx. This decouples authz from any specific authn scheme.
+// The middleware reads the standard authenticated subject through
+// authn.SubjectFrom. WithSubjectFunc overrides that reader for workload
+// identity, external authentication middleware, and tests.
 //
 // # Audit integration
 //
-// When WithAuditor is configured with an audit.Auditor, the middleware
-// emits typed CloudEvents events on authorization allowed, denied, and error
-// decisions. The authenticated subject is written to the CloudEvents authid
-// extension so platform audit storage can project actor_id. Without the option,
-// the middleware is silent.
+// When WithAuditor is configured with an audit.Auditor, the middleware emits
+// typed CloudEvents events for allowed, denied, and error decisions. The typed
+// payload contains the authenticated subject; the CloudEvents subject identifies
+// the authorization resource. Without the option, the middleware is silent.
 //
 // # Future: contextual tuples / attributes
 //

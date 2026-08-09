@@ -2,29 +2,26 @@ package authn
 
 import "context"
 
-// This file holds the package-private ctx channel used by the `Server`
-// dispatcher and the `Multi` decorator to communicate without extending the
-// public `Authenticator` interface.
-//
-// allowedSchemes is written by Server from authn rule schemes and read by
-// Multi to filter engines. Keys and accessors are intentionally unexported:
-// external packages, including engine sub-packages, MUST NOT participate in
-// this channel directly.
+type authenticationKey struct{}
 
-// --- allowedSchemes ctx channel ----------------------------------------
-
-type allowedSchemesKey struct{}
-
-// withAllowedSchemes attaches the allowed scheme set computed by `Server`
-// from the matched authn rule. A nil `allowed` is permitted and signals
-// "no restriction" (`Multi` then tries every engine).
-func withAllowedSchemes(ctx context.Context, allowed map[string]struct{}) context.Context {
-	return context.WithValue(ctx, allowedSchemesKey{}, allowed)
+func withAuthentication(ctx context.Context, authentication Authentication) context.Context {
+	return context.WithValue(ctx, authenticationKey{}, authentication)
 }
 
-// allowedSchemesFrom returns the allowed-schemes set previously installed
-// by `withAllowedSchemes`, or nil if absent.
-func allowedSchemesFrom(ctx context.Context) map[string]struct{} {
-	v, _ := ctx.Value(allowedSchemesKey{}).(map[string]struct{})
-	return v
+// AuthenticationFrom reads the standard validated authentication result.
+func AuthenticationFrom(ctx context.Context) (Authentication, bool) {
+	authentication, ok := ctx.Value(authenticationKey{}).(Authentication)
+	if !ok || authentication.Subject == "" {
+		return Authentication{}, false
+	}
+	return authentication, true
+}
+
+// SubjectFrom reads the validated subject from the standard authentication result.
+func SubjectFrom(ctx context.Context) (string, bool) {
+	authentication, ok := AuthenticationFrom(ctx)
+	if !ok {
+		return "", false
+	}
+	return authentication.Subject, true
 }

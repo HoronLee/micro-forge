@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strings"
 
 	authzpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/v1"
 	"github.com/Servora-Kit/servora/cmd/internal/optionmerge"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
@@ -121,6 +123,10 @@ func generate(gen *protogen.Plugin) error {
 					ResourceType:    merged.GetResourceType(),
 					ResourceIdField: merged.GetResourceIdField(),
 				}
+				operation := fmt.Sprintf("/%s/%s", fullName, methodName)
+				if err := validateCheckRule(operation, merged, m.Input.Desc); err != nil {
+					return err
+				}
 
 				if groups[dir] == nil {
 					groups[dir] = &dirGroup{
@@ -129,7 +135,7 @@ func generate(gen *protogen.Plugin) error {
 					}
 				}
 
-				op := fmt.Sprintf("/%s/%s", fullName, methodName)
+				op := operation
 				if groups[dir].seen[op] {
 					continue
 				}
@@ -202,6 +208,61 @@ func extractServiceDefault(s *protogen.Service) *authzpb.AuthzRule {
 		return nil
 	}
 	return r
+}
+
+func validateCheckRule(operation string, rule *authzpb.AuthzRule, input protoreflect.MessageDescriptor) error {
+	if rule.GetMode() != authzpb.AuthzMode_AUTHZ_MODE_CHECK {
+		return nil
+	}
+	action := rule.GetAction()
+	if strings.TrimSpace(action) == "" {
+		return fmt.Errorf("authz: operation %q CHECK rule requires action", operation)
+	}
+	if action != strings.TrimSpace(action) {
+		return fmt.Errorf("authz: operation %q action must not contain leading or trailing whitespace", operation)
+	}
+	resourceType := rule.GetResourceType()
+	if strings.TrimSpace(resourceType) == "" {
+		return fmt.Errorf("authz: operation %q CHECK rule requires resource_type", operation)
+	}
+	if resourceType != strings.TrimSpace(resourceType) {
+		return fmt.Errorf("authz: operation %q resource_type must not contain leading or trailing whitespace", operation)
+	}
+	fieldPath := rule.GetResourceIdField()
+	if strings.TrimSpace(fieldPath) == "" {
+		return fmt.Errorf("authz: operation %q CHECK rule requires resource_id_field", operation)
+	}
+	if fieldPath != strings.TrimSpace(fieldPath) {
+		return fmt.Errorf("authz: operation %q resource_id_field must not contain leading or trailing whitespace", operation)
+	}
+
+	current := input
+	segments := strings.Split(fieldPath, ".")
+	for index, segment := range segments {
+		if segment == "" {
+			return fmt.Errorf("authz: operation %q resource_id_field %q contains an empty segment", operation, fieldPath)
+		}
+		field := current.Fields().ByName(protoreflect.Name(segment))
+		if field == nil {
+			return fmt.Errorf("authz: operation %q resource_id_field %q: field %q not found in %s", operation, fieldPath, segment, current.FullName())
+		}
+		if field.IsList() || field.IsMap() {
+			return fmt.Errorf("authz: operation %q resource_id_field %q: field %q is repeated or map", operation, fieldPath, segment)
+		}
+
+		last := index == len(segments)-1
+		if !last {
+			if field.Kind() != protoreflect.MessageKind && field.Kind() != protoreflect.GroupKind {
+				return fmt.Errorf("authz: operation %q resource_id_field %q: intermediate field %q is not a message", operation, fieldPath, segment)
+			}
+			current = field.Message()
+			continue
+		}
+		if field.Kind() == protoreflect.MessageKind || field.Kind() == protoreflect.GroupKind {
+			return fmt.Errorf("authz: operation %q resource_id_field %q terminates on a message", operation, fieldPath)
+		}
+	}
+	return nil
 }
 
 // mergeRules is now provided by cmd/internal/optionmerge.Merge.

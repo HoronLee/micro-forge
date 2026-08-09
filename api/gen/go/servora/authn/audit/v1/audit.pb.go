@@ -21,20 +21,71 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// AuthnFailure is the CloudEvents data payload for servora.authn.failure.v1
-// events. All string fields MUST be sanitised — no raw tokens, API keys, or
-// full JWT claims may appear here.
+// AuthnFailureReason is a stable, credential-free authentication outcome.
+type AuthnFailureReason int32
+
+const (
+	AuthnFailureReason_AUTHN_FAILURE_REASON_UNSPECIFIED    AuthnFailureReason = 0
+	AuthnFailureReason_AUTHN_FAILURE_REASON_NO_CREDENTIALS AuthnFailureReason = 1
+	AuthnFailureReason_AUTHN_FAILURE_REASON_REJECTED       AuthnFailureReason = 2
+	AuthnFailureReason_AUTHN_FAILURE_REASON_UNAVAILABLE    AuthnFailureReason = 3
+	AuthnFailureReason_AUTHN_FAILURE_REASON_INVALID_RESULT AuthnFailureReason = 4
+	AuthnFailureReason_AUTHN_FAILURE_REASON_INTERNAL       AuthnFailureReason = 5
+)
+
+// Enum value maps for AuthnFailureReason.
+var (
+	AuthnFailureReason_name = map[int32]string{
+		0: "AUTHN_FAILURE_REASON_UNSPECIFIED",
+		1: "AUTHN_FAILURE_REASON_NO_CREDENTIALS",
+		2: "AUTHN_FAILURE_REASON_REJECTED",
+		3: "AUTHN_FAILURE_REASON_UNAVAILABLE",
+		4: "AUTHN_FAILURE_REASON_INVALID_RESULT",
+		5: "AUTHN_FAILURE_REASON_INTERNAL",
+	}
+	AuthnFailureReason_value = map[string]int32{
+		"AUTHN_FAILURE_REASON_UNSPECIFIED":    0,
+		"AUTHN_FAILURE_REASON_NO_CREDENTIALS": 1,
+		"AUTHN_FAILURE_REASON_REJECTED":       2,
+		"AUTHN_FAILURE_REASON_UNAVAILABLE":    3,
+		"AUTHN_FAILURE_REASON_INVALID_RESULT": 4,
+		"AUTHN_FAILURE_REASON_INTERNAL":       5,
+	}
+)
+
+func (x AuthnFailureReason) Enum() *AuthnFailureReason {
+	p := new(AuthnFailureReason)
+	*p = x
+	return p
+}
+
+func (x AuthnFailureReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AuthnFailureReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_servora_authn_audit_v1_audit_proto_enumTypes[0].Descriptor()
+}
+
+func (AuthnFailureReason) Type() protoreflect.EnumType {
+	return &file_servora_authn_audit_v1_audit_proto_enumTypes[0]
+}
+
+func (x AuthnFailureReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AuthnFailureReason.Descriptor instead.
+func (AuthnFailureReason) EnumDescriptor() ([]byte, []int) {
+	return file_servora_authn_audit_v1_audit_proto_rawDescGZIP(), []int{0}
+}
+
+// AuthnFailure is the CloudEvents data payload for servora.authn.failure.v1.
 type AuthnFailure struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// reason is the high-level failure reason (e.g. "AUTHN_FAILED").
-	Reason string `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
-	// code is the HTTP/gRPC status code (e.g. 401).
-	Code int32 `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`
-	// message is a sanitised, human-readable failure description.
-	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	// attempts lists the per-scheme authentication results when Multi dispatch
-	// was used.
-	Attempts      []*SchemeAttempt `protobuf:"bytes,4,rep,name=attempts,proto3" json:"attempts,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reason        AuthnFailureReason     `protobuf:"varint,1,opt,name=reason,proto3,enum=servora.authn.audit.v1.AuthnFailureReason" json:"reason,omitempty"`
+	Code          int32                  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`
+	Attempts      []*SchemeAttempt       `protobuf:"bytes,3,rep,name=attempts,proto3" json:"attempts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -69,11 +120,11 @@ func (*AuthnFailure) Descriptor() ([]byte, []int) {
 	return file_servora_authn_audit_v1_audit_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *AuthnFailure) GetReason() string {
+func (x *AuthnFailure) GetReason() AuthnFailureReason {
 	if x != nil {
 		return x.Reason
 	}
-	return ""
+	return AuthnFailureReason_AUTHN_FAILURE_REASON_UNSPECIFIED
 }
 
 func (x *AuthnFailure) GetCode() int32 {
@@ -83,13 +134,6 @@ func (x *AuthnFailure) GetCode() int32 {
 	return 0
 }
 
-func (x *AuthnFailure) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
 func (x *AuthnFailure) GetAttempts() []*SchemeAttempt {
 	if x != nil {
 		return x.Attempts
@@ -97,16 +141,11 @@ func (x *AuthnFailure) GetAttempts() []*SchemeAttempt {
 	return nil
 }
 
-// SchemeAttempt records the outcome of a single authentication scheme within a
-// Multi-dispatcher round.
+// SchemeAttempt records one candidate scheme without backend error text.
 type SchemeAttempt struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// scheme is the authenticator name (e.g. "jwt", "apikey", "casdoor").
-	Scheme string `protobuf:"bytes,1,opt,name=scheme,proto3" json:"scheme,omitempty"`
-	// reason is the sanitised failure reason returned by this scheme's backend.
-	Reason string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	// message is a sanitised description from this scheme's backend.
-	Message       string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scheme        string                 `protobuf:"bytes,1,opt,name=scheme,proto3" json:"scheme,omitempty"`
+	Reason        AuthnFailureReason     `protobuf:"varint,2,opt,name=reason,proto3,enum=servora.authn.audit.v1.AuthnFailureReason" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,29 +187,18 @@ func (x *SchemeAttempt) GetScheme() string {
 	return ""
 }
 
-func (x *SchemeAttempt) GetReason() string {
+func (x *SchemeAttempt) GetReason() AuthnFailureReason {
 	if x != nil {
 		return x.Reason
 	}
-	return ""
+	return AuthnFailureReason_AUTHN_FAILURE_REASON_UNSPECIFIED
 }
 
-func (x *SchemeAttempt) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-// AuthnSuccess is the CloudEvents data payload for servora.authn.success.v1
-// events. Identity fields are intentionally omitted — the authenticated
-// subject is carried in CloudEvents extensions or set by the business layer.
+// AuthnSuccess is the CloudEvents data payload for servora.authn.success.v1.
 type AuthnSuccess struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// scheme is the authentication scheme that succeeded (e.g. "jwt", "apikey").
-	Scheme string `protobuf:"bytes,1,opt,name=scheme,proto3" json:"scheme,omitempty"`
-	// message is an optional human-readable note.
-	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scheme        string                 `protobuf:"bytes,1,opt,name=scheme,proto3" json:"scheme,omitempty"`
+	Subject       string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -212,9 +240,9 @@ func (x *AuthnSuccess) GetScheme() string {
 	return ""
 }
 
-func (x *AuthnSuccess) GetMessage() string {
+func (x *AuthnSuccess) GetSubject() string {
 	if x != nil {
-		return x.Message
+		return x.Subject
 	}
 	return ""
 }
@@ -223,19 +251,24 @@ var File_servora_authn_audit_v1_audit_proto protoreflect.FileDescriptor
 
 const file_servora_authn_audit_v1_audit_proto_rawDesc = "" +
 	"\n" +
-	"\"servora/authn/audit/v1/audit.proto\x12\x16servora.authn.audit.v1\"\x97\x01\n" +
-	"\fAuthnFailure\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\x12A\n" +
-	"\battempts\x18\x04 \x03(\v2%.servora.authn.audit.v1.SchemeAttemptR\battempts\"Y\n" +
+	"\"servora/authn/audit/v1/audit.proto\x12\x16servora.authn.audit.v1\"\xa9\x01\n" +
+	"\fAuthnFailure\x12B\n" +
+	"\x06reason\x18\x01 \x01(\x0e2*.servora.authn.audit.v1.AuthnFailureReasonR\x06reason\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\x12A\n" +
+	"\battempts\x18\x03 \x03(\v2%.servora.authn.audit.v1.SchemeAttemptR\battempts\"k\n" +
 	"\rSchemeAttempt\x12\x16\n" +
-	"\x06scheme\x18\x01 \x01(\tR\x06scheme\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"@\n" +
+	"\x06scheme\x18\x01 \x01(\tR\x06scheme\x12B\n" +
+	"\x06reason\x18\x02 \x01(\x0e2*.servora.authn.audit.v1.AuthnFailureReasonR\x06reason\"@\n" +
 	"\fAuthnSuccess\x12\x16\n" +
 	"\x06scheme\x18\x01 \x01(\tR\x06scheme\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessageBOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/audit/v1;authnauditpbb\x06proto3"
+	"\asubject\x18\x02 \x01(\tR\asubject*\xf8\x01\n" +
+	"\x12AuthnFailureReason\x12$\n" +
+	" AUTHN_FAILURE_REASON_UNSPECIFIED\x10\x00\x12'\n" +
+	"#AUTHN_FAILURE_REASON_NO_CREDENTIALS\x10\x01\x12!\n" +
+	"\x1dAUTHN_FAILURE_REASON_REJECTED\x10\x02\x12$\n" +
+	" AUTHN_FAILURE_REASON_UNAVAILABLE\x10\x03\x12'\n" +
+	"#AUTHN_FAILURE_REASON_INVALID_RESULT\x10\x04\x12!\n" +
+	"\x1dAUTHN_FAILURE_REASON_INTERNAL\x10\x05BOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authn/audit/v1;authnauditpbb\x06proto3"
 
 var (
 	file_servora_authn_audit_v1_audit_proto_rawDescOnce sync.Once
@@ -249,19 +282,23 @@ func file_servora_authn_audit_v1_audit_proto_rawDescGZIP() []byte {
 	return file_servora_authn_audit_v1_audit_proto_rawDescData
 }
 
+var file_servora_authn_audit_v1_audit_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_servora_authn_audit_v1_audit_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_servora_authn_audit_v1_audit_proto_goTypes = []any{
-	(*AuthnFailure)(nil),  // 0: servora.authn.audit.v1.AuthnFailure
-	(*SchemeAttempt)(nil), // 1: servora.authn.audit.v1.SchemeAttempt
-	(*AuthnSuccess)(nil),  // 2: servora.authn.audit.v1.AuthnSuccess
+	(AuthnFailureReason)(0), // 0: servora.authn.audit.v1.AuthnFailureReason
+	(*AuthnFailure)(nil),    // 1: servora.authn.audit.v1.AuthnFailure
+	(*SchemeAttempt)(nil),   // 2: servora.authn.audit.v1.SchemeAttempt
+	(*AuthnSuccess)(nil),    // 3: servora.authn.audit.v1.AuthnSuccess
 }
 var file_servora_authn_audit_v1_audit_proto_depIdxs = []int32{
-	1, // 0: servora.authn.audit.v1.AuthnFailure.attempts:type_name -> servora.authn.audit.v1.SchemeAttempt
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: servora.authn.audit.v1.AuthnFailure.reason:type_name -> servora.authn.audit.v1.AuthnFailureReason
+	2, // 1: servora.authn.audit.v1.AuthnFailure.attempts:type_name -> servora.authn.audit.v1.SchemeAttempt
+	0, // 2: servora.authn.audit.v1.SchemeAttempt.reason:type_name -> servora.authn.audit.v1.AuthnFailureReason
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_servora_authn_audit_v1_audit_proto_init() }
@@ -274,13 +311,14 @@ func file_servora_authn_audit_v1_audit_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_servora_authn_audit_v1_audit_proto_rawDesc), len(file_servora_authn_audit_v1_audit_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_servora_authn_audit_v1_audit_proto_goTypes,
 		DependencyIndexes: file_servora_authn_audit_v1_audit_proto_depIdxs,
+		EnumInfos:         file_servora_authn_audit_v1_audit_proto_enumTypes,
 		MessageInfos:      file_servora_authn_audit_v1_audit_proto_msgTypes,
 	}.Build()
 	File_servora_authn_audit_v1_audit_proto = out.File

@@ -85,8 +85,8 @@ type AuthzRule struct {
 	Action string `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
 	// Resource type, e.g. "platform", "video", "server".
 	ResourceType string `protobuf:"bytes,3,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	// Proto field name in the request that carries the resource ID, e.g. "id".
-	// When empty, a static default resource ID is used (singleton/platform-level checks).
+	// Required proto field path in the request that carries the resource ID, e.g. "id".
+	// The path must resolve to a singular scalar field.
 	ResourceIdField string `protobuf:"bytes,4,opt,name=resource_id_field,json=resourceIdField,proto3" json:"resource_id_field,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache

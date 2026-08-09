@@ -21,17 +21,13 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Decision enumerates the three possible authz outcomes.
 type AuthzDecision_Decision int32
 
 const (
 	AuthzDecision_DECISION_UNSPECIFIED AuthzDecision_Decision = 0
-	// ALLOWED — authorizer.Check returned (true, nil).
-	AuthzDecision_DECISION_ALLOWED AuthzDecision_Decision = 1
-	// DENIED — authorizer.Check returned (false, nil): policy explicitly denied.
-	AuthzDecision_DECISION_DENIED AuthzDecision_Decision = 2
-	// ERROR — authorizer.Check returned (_, err != nil): check itself failed.
-	AuthzDecision_DECISION_ERROR AuthzDecision_Decision = 3
+	AuthzDecision_DECISION_ALLOWED     AuthzDecision_Decision = 1
+	AuthzDecision_DECISION_DENIED      AuthzDecision_Decision = 2
+	AuthzDecision_DECISION_ERROR       AuthzDecision_Decision = 3
 )
 
 // Enum value maps for AuthzDecision_Decision.
@@ -77,31 +73,74 @@ func (AuthzDecision_Decision) EnumDescriptor() ([]byte, []int) {
 	return file_servora_authz_audit_v1_audit_proto_rawDescGZIP(), []int{0, 0}
 }
 
-// AuthzDecision is the CloudEvents data payload shared by all three authz
-// audit event types:
-//   - servora.authz.allowed.v1
-//   - servora.authz.denied.v1
-//   - servora.authz.error.v1
-//
-// The Decision enum distinguishes outcomes so consumers can branch on data
-// without re-parsing the CloudEvents type attribute.
+type AuthzDecision_Reason int32
+
+const (
+	AuthzDecision_REASON_UNSPECIFIED     AuthzDecision_Reason = 0
+	AuthzDecision_REASON_ALLOWED         AuthzDecision_Reason = 1
+	AuthzDecision_REASON_DENIED          AuthzDecision_Reason = 2
+	AuthzDecision_REASON_INVALID_REQUEST AuthzDecision_Reason = 3
+	AuthzDecision_REASON_UNAVAILABLE     AuthzDecision_Reason = 4
+	AuthzDecision_REASON_INTERNAL        AuthzDecision_Reason = 5
+)
+
+// Enum value maps for AuthzDecision_Reason.
+var (
+	AuthzDecision_Reason_name = map[int32]string{
+		0: "REASON_UNSPECIFIED",
+		1: "REASON_ALLOWED",
+		2: "REASON_DENIED",
+		3: "REASON_INVALID_REQUEST",
+		4: "REASON_UNAVAILABLE",
+		5: "REASON_INTERNAL",
+	}
+	AuthzDecision_Reason_value = map[string]int32{
+		"REASON_UNSPECIFIED":     0,
+		"REASON_ALLOWED":         1,
+		"REASON_DENIED":          2,
+		"REASON_INVALID_REQUEST": 3,
+		"REASON_UNAVAILABLE":     4,
+		"REASON_INTERNAL":        5,
+	}
+)
+
+func (x AuthzDecision_Reason) Enum() *AuthzDecision_Reason {
+	p := new(AuthzDecision_Reason)
+	*p = x
+	return p
+}
+
+func (x AuthzDecision_Reason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AuthzDecision_Reason) Descriptor() protoreflect.EnumDescriptor {
+	return file_servora_authz_audit_v1_audit_proto_enumTypes[1].Descriptor()
+}
+
+func (AuthzDecision_Reason) Type() protoreflect.EnumType {
+	return &file_servora_authz_audit_v1_audit_proto_enumTypes[1]
+}
+
+func (x AuthzDecision_Reason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AuthzDecision_Reason.Descriptor instead.
+func (AuthzDecision_Reason) EnumDescriptor() ([]byte, []int) {
+	return file_servora_authz_audit_v1_audit_proto_rawDescGZIP(), []int{0, 1}
+}
+
+// AuthzDecision is the typed payload shared by authorization decision events.
 type AuthzDecision struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Decision AuthzDecision_Decision `protobuf:"varint,1,opt,name=decision,proto3,enum=servora.authz.audit.v1.AuthzDecision_Decision" json:"decision,omitempty"`
-	// action is the authz action being checked (e.g. "read", "delete").
-	Action string `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
-	// resource_type is the resource type from the authz rule (e.g. "document").
-	ResourceType string `protobuf:"bytes,3,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	// resource_id is the resolved resource identifier.
-	ResourceId string `protobuf:"bytes,4,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	// backend identifies the authorizer implementation (e.g. "openfga", "casbin").
-	Backend string `protobuf:"bytes,5,opt,name=backend,proto3" json:"backend,omitempty"`
-	// reason is an optional Kratos-style reason code (e.g. "AUTHZ_DENIED").
-	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
-	// code is the HTTP/gRPC status code.
-	Code int32 `protobuf:"varint,7,opt,name=code,proto3" json:"code,omitempty"`
-	// message is a sanitised description.
-	Message       string `protobuf:"bytes,8,opt,name=message,proto3" json:"message,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Decision      AuthzDecision_Decision `protobuf:"varint,1,opt,name=decision,proto3,enum=servora.authz.audit.v1.AuthzDecision_Decision" json:"decision,omitempty"`
+	Subject       string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	Action        string                 `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	ResourceType  string                 `protobuf:"bytes,4,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId    string                 `protobuf:"bytes,5,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Reason        AuthzDecision_Reason   `protobuf:"varint,6,opt,name=reason,proto3,enum=servora.authz.audit.v1.AuthzDecision_Reason" json:"reason,omitempty"`
+	Code          int32                  `protobuf:"varint,7,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -143,6 +182,13 @@ func (x *AuthzDecision) GetDecision() AuthzDecision_Decision {
 	return AuthzDecision_DECISION_UNSPECIFIED
 }
 
+func (x *AuthzDecision) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
 func (x *AuthzDecision) GetAction() string {
 	if x != nil {
 		return x.Action
@@ -164,18 +210,11 @@ func (x *AuthzDecision) GetResourceId() string {
 	return ""
 }
 
-func (x *AuthzDecision) GetBackend() string {
-	if x != nil {
-		return x.Backend
-	}
-	return ""
-}
-
-func (x *AuthzDecision) GetReason() string {
+func (x *AuthzDecision) GetReason() AuthzDecision_Reason {
 	if x != nil {
 		return x.Reason
 	}
-	return ""
+	return AuthzDecision_REASON_UNSPECIFIED
 }
 
 func (x *AuthzDecision) GetCode() int32 {
@@ -185,33 +224,32 @@ func (x *AuthzDecision) GetCode() int32 {
 	return 0
 }
 
-func (x *AuthzDecision) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
 var File_servora_authz_audit_v1_audit_proto protoreflect.FileDescriptor
 
 const file_servora_authz_audit_v1_audit_proto_rawDesc = "" +
 	"\n" +
-	"\"servora/authz/audit/v1/audit.proto\x12\x16servora.authz.audit.v1\"\xfe\x02\n" +
+	"\"servora/authz/audit/v1/audit.proto\x12\x16servora.authz.audit.v1\"\xa5\x04\n" +
 	"\rAuthzDecision\x12J\n" +
-	"\bdecision\x18\x01 \x01(\x0e2..servora.authz.audit.v1.AuthzDecision.DecisionR\bdecision\x12\x16\n" +
-	"\x06action\x18\x02 \x01(\tR\x06action\x12#\n" +
-	"\rresource_type\x18\x03 \x01(\tR\fresourceType\x12\x1f\n" +
-	"\vresource_id\x18\x04 \x01(\tR\n" +
-	"resourceId\x12\x18\n" +
-	"\abackend\x18\x05 \x01(\tR\abackend\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x12\n" +
-	"\x04code\x18\a \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\b \x01(\tR\amessage\"c\n" +
+	"\bdecision\x18\x01 \x01(\x0e2..servora.authz.audit.v1.AuthzDecision.DecisionR\bdecision\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\x12#\n" +
+	"\rresource_type\x18\x04 \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\x05 \x01(\tR\n" +
+	"resourceId\x12D\n" +
+	"\x06reason\x18\x06 \x01(\x0e2,.servora.authz.audit.v1.AuthzDecision.ReasonR\x06reason\x12\x12\n" +
+	"\x04code\x18\a \x01(\x05R\x04code\"c\n" +
 	"\bDecision\x12\x18\n" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DECISION_ALLOWED\x10\x01\x12\x13\n" +
 	"\x0fDECISION_DENIED\x10\x02\x12\x12\n" +
-	"\x0eDECISION_ERROR\x10\x03BOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/audit/v1;authzauditpbb\x06proto3"
+	"\x0eDECISION_ERROR\x10\x03\"\x90\x01\n" +
+	"\x06Reason\x12\x16\n" +
+	"\x12REASON_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eREASON_ALLOWED\x10\x01\x12\x11\n" +
+	"\rREASON_DENIED\x10\x02\x12\x1a\n" +
+	"\x16REASON_INVALID_REQUEST\x10\x03\x12\x16\n" +
+	"\x12REASON_UNAVAILABLE\x10\x04\x12\x13\n" +
+	"\x0fREASON_INTERNAL\x10\x05BOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/authz/audit/v1;authzauditpbb\x06proto3"
 
 var (
 	file_servora_authz_audit_v1_audit_proto_rawDescOnce sync.Once
@@ -225,19 +263,21 @@ func file_servora_authz_audit_v1_audit_proto_rawDescGZIP() []byte {
 	return file_servora_authz_audit_v1_audit_proto_rawDescData
 }
 
-var file_servora_authz_audit_v1_audit_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_servora_authz_audit_v1_audit_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_servora_authz_audit_v1_audit_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_servora_authz_audit_v1_audit_proto_goTypes = []any{
 	(AuthzDecision_Decision)(0), // 0: servora.authz.audit.v1.AuthzDecision.Decision
-	(*AuthzDecision)(nil),       // 1: servora.authz.audit.v1.AuthzDecision
+	(AuthzDecision_Reason)(0),   // 1: servora.authz.audit.v1.AuthzDecision.Reason
+	(*AuthzDecision)(nil),       // 2: servora.authz.audit.v1.AuthzDecision
 }
 var file_servora_authz_audit_v1_audit_proto_depIdxs = []int32{
 	0, // 0: servora.authz.audit.v1.AuthzDecision.decision:type_name -> servora.authz.audit.v1.AuthzDecision.Decision
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 1: servora.authz.audit.v1.AuthzDecision.reason:type_name -> servora.authz.audit.v1.AuthzDecision.Reason
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_servora_authz_audit_v1_audit_proto_init() }
@@ -250,7 +290,7 @@ func file_servora_authz_audit_v1_audit_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_servora_authz_audit_v1_audit_proto_rawDesc), len(file_servora_authz_audit_v1_audit_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,

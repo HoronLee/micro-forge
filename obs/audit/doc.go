@@ -33,9 +33,8 @@
 // # CloudEvents Attributes
 //
 // NewEvent sets CloudEvents required attributes and uses source="//app-name".
-// The generic RPC audit middleware sets subject to the transport operation.
-// Extensions are producer-owned: NewEvent adds traceparent/tracestate when a
-// sampled OTel span is present, the RPC middleware adds errormessage for handler
-// errors, authz emits authid, and backend-specific fields such as partitionkey
-// stay private to their backend package.
+// The generic RPC audit middleware sets subject to the transport operation and
+// adds errormessage for handler errors. AuthN/AuthZ identities live in their
+// typed payloads rather than authid. Other extensions are producer-owned, while
+// backend-only fields such as partitionkey stay private to their backend package.
 package audit

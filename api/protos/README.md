@@ -10,9 +10,8 @@ Proto files are organized in these top-level groups under `servora/`:
 |-------|---------|---------|
 | Annotations (flat) | Extension annotations consumed by `protoc-gen-servora-*` plugins. Each namespace holds a single `annotations.proto`. | `audit/v1` / `authn/v1` / `authz/v1` / `mapper/v1` / `conf/v1` |
 | `core/v1/` | Framework startup bootstrap model. | `bootstrap.proto` (Bootstrap / App / Server / Data / Registry / Source / Observability) |
-| `contrib/<域>/v1/` | Optional ecosystem sections consumed by contrib packages or business bootstrap code. | `db/redis` / `kafka` / `mail` / `db/clickhouse` |
-| `security/<域>/v1/` | Security runtime configuration consumed by security packages. | `tls` / `jwt` / `authn/oidc` / `authz/openfga` |
-| `transport/<域>/v1/` | Transport runtime configuration consumed by transport packages. | `http/cors` |
+| `contrib/<域>/v1/` | Optional ecosystem sections consumed by contrib packages or business bootstrap code. | `db/redis` / `kafka` / `mail` / `db/clickhouse` / `openfga` |
+| `security/<域>/v1/` | Security primitives shared by runtime packages. | `tls` / `jwt` |
 | `obs/<域>/v1/` | Observability runtime configuration consumed by obs packages. | `audit` |
 | Common schema | Shared API messages that are not framework bootstrap configuration. | `pagination/v1/` |
 | Neutral schema | CNCF / third-party envelope schemas that do not fit the categories above. | `cloudevents/v1/` |
@@ -31,8 +30,7 @@ Proto files are organized in these top-level groups under `servora/`:
 | `servora.contrib.mail.v1` | SMTP and sender identity configuration provided as a proto-only convenience section. |
 | `servora.security.tls.v1` | Shared TLS configuration referenced by core server/client endpoint config and consumed by `security/tls`. |
 | `servora.security.jwt.v1` | JWT issuer / verifier configuration, including generated defaults for `access_expire=3600` and `refresh_expire=604800`. |
-| `servora.security.authn.oidc.v1` | OIDC authn backend public config; section key `authn.oidc` (optional), generated required checks for `crypto_key` / `login_base_url` and defaults for refresh-token/logout fields. |
-| `servora.security.authz.openfga.v1` | OpenFGA authz backend public config; section key `authz.openfga` (optional), generated required checks for `api_url` / `store_id`. |
+| `servora.contrib.openfga.v1` | OpenFGA official SDK construction config; section key `openfga` (optional), generated required checks for `api_url` / `store_id`. |
 | `servora.audit.v1` | Audit annotation extensions for `protoc-gen-servora-audit` (extension `5010x`, supports service-level `service_default` + three-state `AuditMode`; `AuditRule` only carries the RPC audit on/off switch). |
 | `servora.authz.v1` | Authorization annotation extensions for `protoc-gen-servora-authz` (extension `5020x`, supports service-level `service_default`). |
 | `servora.authn.v1` | Authentication annotation extensions for `protoc-gen-servora-authn` (extension `5030x`, supports service-level `service_default` + `schemes` / `credentials_locations` fields). |

@@ -4,77 +4,67 @@ import (
 	"fmt"
 	"strings"
 
-	authzpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// resolveResource determines the resource type and ID for the given rule and request.
-func resolveResource(rule *authzpb.AuthzRule, req any, defaultResourceID string) (resourceType, resourceID string, err error) {
-	resourceType = rule.GetResourceType()
-	if resourceType == "" {
-		return "", "", fmt.Errorf("resource_type not specified in authz rule")
+func resolveResource(rule compiledRule, req any) (Resource, error) {
+	resource := Resource{Type: rule.resourceType}
+	if resource.Type == "" {
+		return resource, fmt.Errorf("authz: resource_type is empty")
+	}
+	if rule.resourceIDField == "" {
+		return resource, fmt.Errorf("authz: resource_id_field is empty")
 	}
 
-	fieldPath := rule.GetResourceIdField()
-	if fieldPath == "" {
-		return resourceType, defaultResourceID, nil
+	id, err := extractProtoField(req, rule.resourceIDField)
+	if err != nil {
+		return resource, err
 	}
-
-	resourceID, err = extractProtoField(req, fieldPath)
-	return
+	resource.ID = id
+	return resource, nil
 }
 
-// extractProtoField resolves a dot-path against a proto message and returns
-// the scalar value at the path's terminus. Constraints:
-//   - Each non-leaf segment must be a singular message field (no list/map).
-//   - The terminus segment must be a scalar (not a message).
-//   - An empty terminus value is treated as an error to preserve the existing
-//     "field is required for authorization" contract.
-//
-// Single-segment paths preserve the prior behavior (top-level scalar lookup).
 func extractProtoField(req any, fieldPath string) (string, error) {
 	if fieldPath == "" {
-		return "", fmt.Errorf("resource_id_field not specified")
+		return "", fmt.Errorf("authz: resource_id_field is empty")
 	}
 	msg, ok := req.(proto.Message)
-	if !ok {
-		return "", fmt.Errorf("request is not a proto message")
+	if !ok || msg == nil {
+		return "", fmt.Errorf("authz: request is not a protobuf message")
 	}
 
 	segments := strings.Split(fieldPath, ".")
 	current := msg.ProtoReflect()
-
-	for i, seg := range segments {
-		fd := current.Descriptor().Fields().ByName(protoreflect.Name(seg))
-		if fd == nil {
-			return "", fmt.Errorf("field %q not found in %s",
-				seg, current.Descriptor().FullName())
+	for index, segment := range segments {
+		if segment == "" {
+			return "", fmt.Errorf("authz: resource_id_field %q contains an empty segment", fieldPath)
 		}
-		if fd.IsList() || fd.IsMap() {
-			return "", fmt.Errorf("field %q is repeated/map; not supported in resource_id_field path", seg)
+		field := current.Descriptor().Fields().ByName(protoreflect.Name(segment))
+		if field == nil {
+			return "", fmt.Errorf("authz: field %q not found in %s", segment, current.Descriptor().FullName())
+		}
+		if field.IsList() || field.IsMap() {
+			return "", fmt.Errorf("authz: field %q is repeated or map", segment)
 		}
 
-		isLast := i == len(segments)-1
-		val := current.Get(fd)
-
-		if !isLast {
-			if fd.Kind() != protoreflect.MessageKind {
-				return "", fmt.Errorf("path segment %q is scalar but path continues", seg)
+		last := index == len(segments)-1
+		value := current.Get(field)
+		if !last {
+			if field.Kind() != protoreflect.MessageKind && field.Kind() != protoreflect.GroupKind {
+				return "", fmt.Errorf("authz: path segment %q is not a message", segment)
 			}
-			current = val.Message()
+			current = value.Message()
 			continue
 		}
-
-		if fd.Kind() == protoreflect.MessageKind {
-			return "", fmt.Errorf("path %q terminates on a message field; expected scalar", fieldPath)
+		if field.Kind() == protoreflect.MessageKind || field.Kind() == protoreflect.GroupKind {
+			return "", fmt.Errorf("authz: path %q terminates on a message", fieldPath)
 		}
-		s := val.String()
-		if s == "" {
-			return "", fmt.Errorf("field %q is empty", fieldPath)
+		result := value.String()
+		if result == "" {
+			return "", fmt.Errorf("authz: field %q is empty", fieldPath)
 		}
-		return s, nil
+		return result, nil
 	}
-
-	return "", fmt.Errorf("unreachable: empty path segments")
+	return "", fmt.Errorf("authz: resource_id_field %q is invalid", fieldPath)
 }

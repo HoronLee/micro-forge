@@ -61,8 +61,6 @@ func (m *AuthnFailure) validate(all bool) error {
 
 	// no validation rules for Code
 
-	// no validation rules for Message
-
 	for idx, item := range m.GetAttempts() {
 		_, _ = idx, item
 
@@ -200,8 +198,6 @@ func (m *SchemeAttempt) validate(all bool) error {
 
 	// no validation rules for Reason
 
-	// no validation rules for Message
-
 	if len(errors) > 0 {
 		return SchemeAttemptMultiError(errors)
 	}
@@ -304,7 +300,7 @@ func (m *AuthnSuccess) validate(all bool) error {
 
 	// no validation rules for Scheme
 
-	// no validation rules for Message
+	// no validation rules for Subject
 
 	if len(errors) > 0 {
 		return AuthnSuccessMultiError(errors)

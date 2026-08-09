@@ -12,7 +12,6 @@ import (
 // Option configures the audit middleware.
 type Option func(*serverConfig)
 
-// extErrorMessage is the CE extension key for handler error summaries (private).
 const extErrorMessage = "errormessage"
 
 type serverConfig struct {

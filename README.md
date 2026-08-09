@@ -166,24 +166,21 @@ service UserService {
 }
 ```
 
-Plugin 生成 `AuthnRules()` 方法表，业务侧装一次中间件即可——`Multi + Named` 注册多种认证引擎，规则表由 `WithRulesFuncs` 注入：
+Plugin 生成 `AuthnRules()` 方法表。具体认证器由应用或 IAM 模块实现，并在服务装配时按优先级交给根 middleware：
 
 ```go
 import (
     "github.com/Servora-Kit/servora/security/authn"
-    authjwt "github.com/Servora-Kit/servora/security/authn/jwt"
-    "github.com/Servora-Kit/servora/security/authn/apikey"
     pb "myapp/api/gen/go/myapp/user/v1"
 )
 
 mw := authn.Server(
-    authn.Multi(
-        authn.Named(authjwt.Scheme, authjwt.NewAuthenticator(authjwt.WithVerifier(verifier))),
-        authn.Named(apikey.Scheme, apikey.NewAuthenticator(apikey.WithStore(keyStore))),
-    ),
+    []authn.Authenticator{oidcAuthenticator, apiKeyAuthenticator},
     authn.WithRulesFuncs(pb.AuthnRules),
 )
 ```
+
+认证器通过 `Scheme()` 固定声明方式，通过 `Authenticate` 返回 `Authentication{Subject}`。根 middleware 负责规则过滤、顺序分派和稳定的 401/503/500 错误映射；具体实现不把 token、API key 或完整 claims 写入认证结果。
 
 #### 授权
 
@@ -220,25 +217,32 @@ service VideoService {
 }
 ```
 
-Plugin 生成 `AuthzRules()` 规则表，业务侧把 `Engine` 实现（OpenFGA / 自研后端）连同规则表交给 `authz.Server` 即可：
+Plugin 生成 `AuthzRules()` 规则表。业务侧先用 generated config 构造官方 OpenFGA SDK Client，再创建 capability-first AuthZ Adapter：
 
 ```go
 import (
-    openfgaconfpb "github.com/Servora-Kit/servora/api/gen/go/servora/security/authz/openfga/v1"
+    openfgaconfpb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/openfga/v1"
+    openfgaauthz "github.com/Servora-Kit/servora/contrib/authz/openfga"
+    openfgaclient "github.com/Servora-Kit/servora/contrib/openfga"
     "github.com/Servora-Kit/servora/security/authz"
-    "github.com/Servora-Kit/servora/security/authz/openfga"
     pb "myapp/api/gen/go/myapp/video/v1"
 )
 
-client, err := openfga.NewClient(&openfgaconfpb.Config{
+sdkClient, err := openfgaclient.NewClient(&openfgaconfpb.OpenFGA{
     ApiUrl:  "http://openfga:8080",
-    StoreId: "store-id",
+    StoreId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
 })
 if err != nil {
     return err
 }
-mw := authz.Server(openfga.NewAuthorizer(client), authz.WithRulesFuncs(pb.AuthzRules))
+authorizer, err := openfgaauthz.New(sdkClient)
+if err != nil {
+    return err
+}
+mw := authz.Server(authorizer, authz.WithRulesFuncs(pb.AuthzRules))
 ```
+
+未配置 `api_token` 时可连接受信内网 HTTP endpoint；一旦配置 `api_token`，`api_url` 必须使用 HTTPS，`NewClient` 会拒绝明文 HTTP，避免 Bearer credential 在传输层泄漏。
 
 #### CRUD 生态
 

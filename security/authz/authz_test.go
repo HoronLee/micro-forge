@@ -1,757 +1,418 @@
 package authz
 
 import (
+	"bytes"
 	"context"
-	"errors"
+	"encoding/json"
+	stderrors "errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/go-kratos/kratos/v3/transport"
-	"google.golang.org/protobuf/types/known/wrapperspb"
-
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-
-	authzpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/v1"
+	kerrors "github.com/go-kratos/kratos/v3/errors"
+	"github.com/go-kratos/kratos/v3/middleware"
+	"github.com/go-kratos/kratos/v3/transport"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+
+	authnpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/v1"
+	authzauditpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/audit/v1"
+	authzpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/v1"
+	"github.com/Servora-Kit/servora/security/authn"
 )
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
+const testOperation = "/test.v1.ResourceService/Get"
 
-// fakeTransport implements transport.Transporter for test purposes.
-type fakeTransport struct {
-	operation string
-}
+type fakeTransport struct{ operation string }
 
 func (f *fakeTransport) Kind() transport.Kind            { return transport.KindHTTP }
 func (f *fakeTransport) Endpoint() string                { return "" }
 func (f *fakeTransport) Operation() string               { return f.operation }
-func (f *fakeTransport) RequestHeader() transport.Header { return &fakeHeader{} }
-func (f *fakeTransport) ReplyHeader() transport.Header   { return &fakeHeader{} }
+func (f *fakeTransport) RequestHeader() transport.Header { return fakeHeader{} }
+func (f *fakeTransport) ReplyHeader() transport.Header   { return fakeHeader{} }
 
 type fakeHeader struct{}
 
-func (h *fakeHeader) Get(key string) string      { return "" }
-func (h *fakeHeader) Set(key, value string)      {}
-func (h *fakeHeader) Add(key, value string)      {}
-func (h *fakeHeader) Keys() []string             { return nil }
-func (h *fakeHeader) Values(key string) []string { return nil }
+func (fakeHeader) Get(string) string      { return "" }
+func (fakeHeader) Set(string, string)     {}
+func (fakeHeader) Add(string, string)     {}
+func (fakeHeader) Keys() []string         { return nil }
+func (fakeHeader) Values(string) []string { return nil }
 
-func transportCtx(operation string) context.Context {
+func serverContext(operation string) context.Context {
 	return transport.NewServerContext(context.Background(), &fakeTransport{operation: operation})
 }
 
-const testOp = "/test.service.v1.TestService/TestMethod"
-
-func staticSubjectFunc(subject string) func(context.Context) (string, bool) {
-	return func(_ context.Context) (string, bool) {
-		if subject == "" {
-			return "", false
-		}
-		return subject, true
-	}
-}
-
-func testRules(rules map[string]*authzpb.AuthzRule) Option {
-	return WithRulesFuncs(func() map[string]*authzpb.AuthzRule {
-		return rules
-	})
-}
-
-// fakeAuthorizer is a minimal Authorizer for unit tests.
 type fakeAuthorizer struct {
-	allowed bool
-	err     error
-	// captured records the last CheckRequest for inspection.
-	mu       sync.Mutex
-	captured *CheckRequest
+	mu         sync.Mutex
+	allowed    bool
+	err        error
+	check      func(context.Context, CheckRequest) (bool, error)
+	requests   []CheckRequest
+	setLoggers int
 }
 
-func (f *fakeAuthorizer) Check(_ context.Context, req CheckRequest) (bool, error) {
+func (f *fakeAuthorizer) Check(ctx context.Context, req CheckRequest) (bool, error) {
 	f.mu.Lock()
-	cp := req
-	f.captured = &cp
+	f.requests = append(f.requests, req)
 	f.mu.Unlock()
+	if f.check != nil {
+		return f.check(ctx, req)
+	}
 	return f.allowed, f.err
 }
 
-func (f *fakeAuthorizer) lastRequest() *CheckRequest {
+func (f *fakeAuthorizer) SetLogger(*slog.Logger) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.captured
+	f.setLoggers++
+	f.mu.Unlock()
 }
 
-// captureAuditor records emitted CloudEvents for assertion.
+func (f *fakeAuthorizer) requestCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.requests)
+}
+
+func (f *fakeAuthorizer) lastRequest() CheckRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.requests[len(f.requests)-1]
+}
+
+type capabilityAuthorizer struct{ fakeAuthorizer }
+
+func (*capabilityAuthorizer) BatchCheck(context.Context, []CheckRequest) ([]bool, error) {
+	return []bool{}, nil
+}
+
+func (*capabilityAuthorizer) ListAllowed(context.Context, string, string, string) ([]string, error) {
+	return []string{}, nil
+}
+
+var (
+	_ Authorizer      = (*fakeAuthorizer)(nil)
+	_ BatchAuthorizer = (*capabilityAuthorizer)(nil)
+	_ Lister          = (*capabilityAuthorizer)(nil)
+)
+
+type staticAuthenticator struct{ subject string }
+
+func (staticAuthenticator) Scheme() authn.Scheme { return "test" }
+func (a staticAuthenticator) Authenticate(context.Context) (authn.Authentication, error) {
+	return authn.Authentication{Subject: a.subject}, nil
+}
+
 type captureAuditor struct {
 	mu     sync.Mutex
 	events []cloudevents.Event
+	err    error
 }
 
 func (a *captureAuditor) Emit(_ context.Context, event cloudevents.Event) error {
 	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.events = append(a.events, event)
-	a.mu.Unlock()
-	return nil
+	return a.err
 }
 
-func (a *captureAuditor) getEvents() []cloudevents.Event {
+func (a *captureAuditor) all() []cloudevents.Event {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	out := make([]cloudevents.Event, len(a.events))
-	copy(out, a.events)
-	return out
+	return append([]cloudevents.Event(nil), a.events...)
 }
 
-func assertAuthID(t *testing.T, e cloudevents.Event, want string) {
+func checkRule() *authzpb.AuthzRule {
+	return &authzpb.AuthzRule{
+		Mode:            authzpb.AuthzMode_AUTHZ_MODE_CHECK,
+		Action:          "read",
+		ResourceType:    "document",
+		ResourceIdField: "value",
+	}
+}
+
+func rules(rule *authzpb.AuthzRule) Option {
+	return WithRulesFuncs(func() map[string]*authzpb.AuthzRule {
+		return map[string]*authzpb.AuthzRule{testOperation: rule}
+	})
+}
+
+func subject(subject string) Option {
+	return WithSubjectFunc(func(context.Context) (string, bool) {
+		return subject, subject != ""
+	})
+}
+
+func invoke(t *testing.T, mw middleware.Middleware, ctx context.Context, req any, handler middleware.Handler) (any, error) {
 	t.Helper()
-	got, ok := e.Extensions()[extAuthID]
-	if !ok {
-		t.Fatalf("event missing %q extension; extensions=%v", extAuthID, e.Extensions())
+	if handler == nil {
+		handler = func(context.Context, any) (any, error) { return "ok", nil }
 	}
-	if got != want {
-		t.Fatalf("event %q extension = %v, want %q", extAuthID, got, want)
-	}
+	return mw(handler)(ctx, req)
 }
 
-// ---------------------------------------------------------------------------
-// Tests: Authorizer.Check interface
-// ---------------------------------------------------------------------------
+func assertPanicContains(t *testing.T, want string, fn func()) {
+	t.Helper()
+	defer func() {
+		recovered := recover()
+		if recovered == nil || !strings.Contains(recovered.(string), want) {
+			t.Fatalf("panic = %v, want substring %q", recovered, want)
+		}
+	}()
+	fn()
+}
 
-func TestAuthorizer_Check_WithMock(t *testing.T) {
-	fa := &fakeAuthorizer{allowed: true}
-	allowed, err := fa.Check(context.Background(), CheckRequest{
-		Subject:      "user:alice",
-		Action:       "view",
-		ResourceType: "document",
-		ResourceID:   "doc-1",
+func TestServerConstructionValidation(t *testing.T) {
+	assertPanicContains(t, "authorizer is nil", func() { Server(nil) })
+	var typedNil *fakeAuthorizer
+	assertPanicContains(t, "authorizer is nil", func() { Server(typedNil) })
+	assertPanicContains(t, "option[0] is nil", func() { Server(&fakeAuthorizer{}, nil) })
+	assertPanicContains(t, "option[0]", func() {
+		Server(&fakeAuthorizer{}, WithSubjectFunc(nil))
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !allowed {
-		t.Error("expected allowed=true")
-	}
-	req := fa.lastRequest()
-	if req.Subject != "user:alice" {
-		t.Errorf("Subject = %q, want user:alice", req.Subject)
-	}
-	if req.Action != "view" {
-		t.Errorf("Action = %q, want view", req.Action)
-	}
-	if req.ResourceType != "document" {
-		t.Errorf("ResourceType = %q, want document", req.ResourceType)
-	}
-	if req.ResourceID != "doc-1" {
-		t.Errorf("ResourceID = %q, want doc-1", req.ResourceID)
-	}
 }
 
-func TestAuthorizer_Check_Denied(t *testing.T) {
-	fa := &fakeAuthorizer{allowed: false}
-	allowed, err := fa.Check(context.Background(), CheckRequest{
-		Subject: "user:bob", Action: "delete", ResourceType: "doc", ResourceID: "1",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if allowed {
-		t.Error("expected allowed=false")
-	}
-}
-
-func TestAuthorizer_Check_Error(t *testing.T) {
-	sentinel := errors.New("backend unavailable")
-	fa := &fakeAuthorizer{err: sentinel}
-	_, err := fa.Check(context.Background(), CheckRequest{
-		Subject: "user:bob", Action: "view", ResourceType: "doc", ResourceID: "1",
-	})
-	if !errors.Is(err, sentinel) {
-		t.Errorf("err = %v, want %v", err, sentinel)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: Server middleware
-// ---------------------------------------------------------------------------
-
-func TestServer_NoRule_Forbidden(t *testing.T) {
-	mw := Server(nil) // no rules configured
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called when no rule exists")
+func TestServerNoTransportFailsClosed(t *testing.T) {
+	called := false
+	_, err := invoke(t, Server(&fakeAuthorizer{}), context.Background(), nil, func(context.Context, any) (any, error) {
+		called = true
 		return nil, nil
 	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected error for missing rule")
+	if !authzpb.IsAuthzErrorReasonInternal(err) || called {
+		t.Fatalf("called = %v, error = %v", called, err)
 	}
 }
 
-func TestServer_ModeNone_Passthrough(t *testing.T) {
-	mw := Server(nil, testRules(map[string]*authzpb.AuthzRule{
-		testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_NONE},
+func TestServerModeNonePassesThrough(t *testing.T) {
+	called := false
+	_, err := invoke(t, Server(&fakeAuthorizer{}, rules(&authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_NONE})), serverContext(testOperation), nil, func(context.Context, any) (any, error) {
+		called = true
+		return nil, nil
+	})
+	if err != nil || !called {
+		t.Fatalf("called = %v, error = %v", called, err)
+	}
+}
+
+func TestServerMissingRuleFailsClosed(t *testing.T) {
+	_, err := invoke(t, Server(&fakeAuthorizer{}), serverContext(testOperation), nil, nil)
+	if !authzpb.IsAuthzErrorReasonInternal(err) {
+		t.Fatalf("error = %v, want generated INTERNAL", err)
+	}
+}
+
+func TestServerUsesStandardAuthnSubjectByDefault(t *testing.T) {
+	authorizer := &fakeAuthorizer{allowed: true}
+	authzMiddleware := Server(authorizer, rules(checkRule()))
+	authnMiddleware := authn.Server([]authn.Authenticator{staticAuthenticator{subject: "user:alice"}})
+	called := false
+	chain := authnMiddleware(authzMiddleware(func(context.Context, any) (any, error) {
+		called = true
+		return nil, nil
 	}))
+	_, err := chain(serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"})
+	if err != nil || !called {
+		t.Fatalf("called = %v, error = %v", called, err)
+	}
+	got := authorizer.lastRequest()
+	if got.Subject != "user:alice" || got.Action != "read" || got.Resource != (Resource{Type: "document", ID: "doc-1"}) {
+		t.Fatalf("request = %#v", got)
+	}
+}
 
-	called := false
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		called = true
-		return "ok", nil
-	})
-
-	ctx := transportCtx(testOp)
-	resp, err := handler(ctx, nil)
+func TestServerSubjectOverride(t *testing.T) {
+	authorizer := &fakeAuthorizer{allowed: true}
+	_, err := invoke(t, Server(authorizer, rules(checkRule()), subject("workload:worker")), serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"}, nil)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatal(err)
 	}
-	if !called {
-		t.Fatal("handler was not called")
-	}
-	if resp != "ok" {
-		t.Errorf("resp = %v, want ok", resp)
+	if got := authorizer.lastRequest().Subject; got != "workload:worker" {
+		t.Fatalf("subject = %q", got)
 	}
 }
 
-func TestServer_NoSubjectFunc_Forbidden(t *testing.T) {
-	mw := Server(&fakeAuthorizer{allowed: true}, testRules(map[string]*authzpb.AuthzRule{
-		testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-	}))
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called without SubjectFunc")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected error when SubjectFunc is not set")
-	}
-}
-
-func TestServer_SubjectFunc_ReturnsFalse_Forbidden(t *testing.T) {
-	mw := Server(&fakeAuthorizer{allowed: true},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(func(_ context.Context) (string, bool) { return "", false }),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called when SubjectFunc returns false")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected error when SubjectFunc returns false")
-	}
-}
-
-func TestServer_NilAuthorizer_ServiceUnavailable(t *testing.T) {
-	mw := Server(nil,
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:123")),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called with nil authorizer")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected error for nil authorizer")
-	}
-}
-
-func TestServer_CheckMode_Allowed(t *testing.T) {
-	fa := &fakeAuthorizer{allowed: true}
-	mw := Server(fa,
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:alice")),
-	)
-
-	called := false
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		called = true
-		return "ok", nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !called {
-		t.Fatal("handler was not called")
-	}
-
-	// Verify the CheckRequest passed to authorizer.
-	req := fa.lastRequest()
-	if req == nil {
-		t.Fatal("authorizer.Check was not called")
-		return
-	}
-	if req.Subject != "user:alice" {
-		t.Errorf("Subject = %q, want user:alice", req.Subject)
-	}
-	if req.Action != "admin" {
-		t.Errorf("Action = %q, want admin", req.Action)
-	}
-	if req.ResourceType != "platform" {
-		t.Errorf("ResourceType = %q, want platform", req.ResourceType)
-	}
-	if req.ResourceID != "default" {
-		t.Errorf("ResourceID = %q, want default", req.ResourceID)
-	}
-}
-
-func TestServer_CheckMode_Denied(t *testing.T) {
-	mw := Server(&fakeAuthorizer{allowed: false},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:bob")),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called for denied subject")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected error for denied subject")
-	}
-}
-
-func TestServer_NoTransport_Passthrough(t *testing.T) {
-	mw := Server(nil) // no rules needed — no transport means skip
-	called := false
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		called = true
-		return "ok", nil
-	})
-
-	_, err := handler(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !called {
-		t.Fatal("handler was not called")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: WithSubjectFunc
-// ---------------------------------------------------------------------------
-
-func TestServer_WithSubjectFunc_PassesSubjectToCheck(t *testing.T) {
-	fa := &fakeAuthorizer{allowed: true}
-	mw := Server(fa,
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "view", ResourceType: "doc"},
-		}),
-		WithSubjectFunc(func(_ context.Context) (string, bool) {
-			return "service:my-svc", true
-		}),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) { return nil, nil })
-	ctx := transportCtx(testOp)
-	if _, err := handler(ctx, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	req := fa.lastRequest()
-	if req.Subject != "service:my-svc" {
-		t.Errorf("Subject = %q, want service:my-svc", req.Subject)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: WithAuditor
-// ---------------------------------------------------------------------------
-
-func TestServer_WithAuditor_DeniedEmitsEvent(t *testing.T) {
+func TestServerMissingSubjectReturnsAuthn401(t *testing.T) {
+	authorizer := &fakeAuthorizer{allowed: true}
 	auditor := &captureAuditor{}
-	mw := Server(&fakeAuthorizer{allowed: false},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:alice")),
-		WithAuditor(auditor),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called on deny")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected denial error")
+	_, err := invoke(t, Server(authorizer, rules(checkRule()), subject(""), WithAuditor(auditor)), serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"}, nil)
+	if !authnpb.IsAuthnErrorReasonUnauthenticated(err) {
+		t.Fatalf("error = %v, want generated AuthN UNAUTHENTICATED", err)
 	}
-
-	events := auditor.getEvents()
-	if len(events) != 1 {
-		t.Fatalf("emit count = %d, want 1", len(events))
-	}
-	e := events[0]
-	if e.Type() != EventTypeAuthzDenied {
-		t.Errorf("event type = %q, want %s", e.Type(), EventTypeAuthzDenied)
-	}
-	assertAuthID(t, e, "user:alice")
-	// Data is protobuf-encoded: check content type and that subject/action appear.
-	if e.DataContentType() != "application/protobuf" {
-		t.Errorf("content type = %q, want application/protobuf", e.DataContentType())
+	if authorizer.requestCount() != 0 || len(auditor.all()) != 0 {
+		t.Fatalf("authorizer calls = %d, audit events = %d", authorizer.requestCount(), len(auditor.all()))
 	}
 }
 
-func TestServer_WithAuditor_ErrorEmitsEvent(t *testing.T) {
+func TestServerDynamicResourceFailureReturns400(t *testing.T) {
+	authorizer := &fakeAuthorizer{allowed: true}
 	auditor := &captureAuditor{}
-	sentinel := errors.New("backend down")
-	mw := Server(&fakeAuthorizer{err: sentinel},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:alice")),
-		WithAuditor(auditor),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called on error")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected error")
+	_, err := invoke(t, Server(authorizer, rules(checkRule()), subject("user:alice"), WithAuditor(auditor)), serverContext(testOperation), &wrapperspb.StringValue{}, nil)
+	if !authzpb.IsAuthzErrorReasonInvalidRequest(err) {
+		t.Fatalf("error = %v, want generated INVALID_REQUEST", err)
 	}
-
-	events := auditor.getEvents()
+	if authorizer.requestCount() != 0 {
+		t.Fatalf("authorizer calls = %d", authorizer.requestCount())
+	}
+	events := auditor.all()
 	if len(events) != 1 {
-		t.Fatalf("emit count = %d, want 1", len(events))
+		t.Fatalf("audit events = %d", len(events))
 	}
-	e := events[0]
-	if e.Type() != EventTypeAuthzError {
-		t.Errorf("event type = %q, want %s", e.Type(), EventTypeAuthzError)
+
+	decision := decodeDecision(t, events[0])
+	if decision.Reason != authzauditpb.AuthzDecision_REASON_INVALID_REQUEST || decision.Code != 400 {
+		t.Fatalf("decision = %#v", decision)
 	}
-	assertAuthID(t, e, "user:alice")
-	// Data is protobuf-encoded: verify content type and that error message appears in bytes.
-	if e.DataContentType() != "application/protobuf" {
-		t.Errorf("content type = %q, want application/protobuf", e.DataContentType())
-	}
-	if rawData := string(e.Data()); !strings.Contains(rawData, sentinel.Error()) {
-		t.Errorf("event data does not contain error message %q", sentinel.Error())
+}
+func TestServerDeniedReturns403(t *testing.T) {
+	_, err := invoke(t, Server(&fakeAuthorizer{allowed: false}, rules(checkRule()), subject("user:alice")), serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"}, nil)
+	if !authzpb.IsAuthzErrorReasonDenied(err) {
+		t.Fatalf("error = %v, want generated DENIED", err)
 	}
 }
 
-func TestServer_WithAuditor_NotConfigured_Silent(t *testing.T) {
-	// No WithAuditor configured — ensure no panic and no emission.
-	mw := Server(&fakeAuthorizer{allowed: false},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:alice")),
-	)
+func TestServerBackendErrorMappingAndWireSafety(t *testing.T) {
+	providerCause := stderrors.New("provider endpoint token-secret detail")
+	tests := []struct {
+		name    string
+		err     error
+		matcher func(error) bool
+		code    int32
+		message string
+	}{
+		{name: "unavailable", err: stderrors.Join(ErrUnavailable, providerCause), matcher: authzpb.IsAuthzErrorReasonUnavailable, code: 503, message: "authorization service unavailable"},
+		{name: "internal", err: providerCause, matcher: authzpb.IsAuthzErrorReasonInternal, code: 500, message: "internal authorization error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := invoke(t, Server(&fakeAuthorizer{err: tt.err}, rules(checkRule()), subject("user:alice")), serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"}, nil)
+			if !tt.matcher(err) || !stderrors.Is(err, providerCause) {
+				t.Fatalf("error = %v", err)
+			}
+			status := kerrors.FromError(err)
+			if status.Code != tt.code || status.Message != tt.message {
+				t.Fatalf("status = (%d, %q)", status.Code, status.Message)
+			}
+			grpcWire, marshalErr := json.Marshal(status.GRPCStatus().Proto())
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			httpWire, marshalErr := json.Marshal(status)
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			if bytes.Contains(grpcWire, []byte("token-secret")) || bytes.Contains(httpWire, []byte("token-secret")) {
+				t.Fatalf("wire leaked cause: grpc=%s http=%s", grpcWire, httpWire)
+			}
+			if strings.Contains(err.Error(), "token-secret") {
+				t.Fatalf("error string leaked cause: %v", err)
+			}
+		})
+	}
+}
 
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler should not be called on deny")
-		return nil, nil
-	})
+func TestServerPreservesIncomingDeadline(t *testing.T) {
+	var seen time.Time
+	authorizer := &fakeAuthorizer{check: func(ctx context.Context, _ CheckRequest) (bool, error) {
+		seen, _ = ctx.Deadline()
+		return true, nil
+	}}
+	ctx, cancel := context.WithTimeout(serverContext(testOperation), time.Second)
+	defer cancel()
+	want, _ := ctx.Deadline()
+	_, err := invoke(t, Server(authorizer, rules(checkRule()), subject("user:alice")), ctx, &wrapperspb.StringValue{Value: "doc-1"}, nil)
+	if err != nil || !seen.Equal(want) {
+		t.Fatalf("deadline = %v, want %v, error = %v", seen, want, err)
+	}
+}
 
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
+func TestServerLoggerIsRootOnly(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buffer, nil))
+	authorizer := &fakeAuthorizer{err: stderrors.New("backend token-secret")}
+	_, err := invoke(t, Server(authorizer, rules(checkRule()), subject("identity-token-secret"), WithLogger(logger)), serverContext(testOperation), &wrapperspb.StringValue{Value: "resource-token-secret"}, nil)
 	if err == nil {
-		t.Fatal("expected denial error")
+		t.Fatal("error = nil")
 	}
-	// If we got here without panic, the nil-auditor path works correctly.
-}
-
-func TestServer_WithAuditor_AllowedEmitsAllowedEvent(t *testing.T) {
-	// When authz allows, audit emits a servora.authz.allowed.v1 event.
-	auditor := &captureAuditor{}
-	mw := Server(&fakeAuthorizer{allowed: true},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:alice")),
-		WithAuditor(auditor),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) { return "ok", nil })
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if authorizer.setLoggers != 0 {
+		t.Fatalf("backend logger injections = %d", authorizer.setLoggers)
 	}
-
-	events := auditor.getEvents()
-	if len(events) != 1 {
-		t.Fatalf("emit count = %d, want 1", len(events))
-	}
-	e := events[0]
-	if e.Type() != EventTypeAuthzAllowed {
-		t.Errorf("event type = %q, want %s", e.Type(), EventTypeAuthzAllowed)
-	}
-	assertAuthID(t, e, "user:alice")
-}
-
-// ---------------------------------------------------------------------------
-// Tests: Check timeout
-// ---------------------------------------------------------------------------
-
-// blockingAuthorizer simulates a slow backend by waiting until ctx is cancelled.
-type blockingAuthorizer struct{}
-
-func (b *blockingAuthorizer) Check(ctx context.Context, _ CheckRequest) (bool, error) {
-	<-ctx.Done()
-	return false, ctx.Err()
-}
-
-func TestServer_CheckTimeout_TripsCheckBeforeBackend(t *testing.T) {
-	mw := Server(
-		&blockingAuthorizer{},
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:123")),
-		WithCheckTimeout(50*time.Millisecond),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler must not be reached when check times out")
-		return nil, nil
-	})
-
-	ctx := transportCtx(testOp)
-	start := time.Now()
-	_, err := handler(ctx, nil)
-	elapsed := time.Since(start)
-
-	if err == nil {
-		t.Fatal("expected timeout error, got nil")
-	}
-	if elapsed >= 500*time.Millisecond {
-		t.Errorf("elapsed = %v, expected < 500ms (timeout should trip well before)", elapsed)
+	logOutput := buffer.String()
+	if !strings.Contains(logOutput, "REASON_INTERNAL") || strings.Contains(logOutput, "token-secret") {
+		t.Fatalf("log = %q", logOutput)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: Fail-open on missing rule
-// ---------------------------------------------------------------------------
+func TestServerTypedAuditOutcomes(t *testing.T) {
+	providerCause := stderrors.New("provider-secret")
+	tests := []struct {
+		name     string
+		allowed  bool
+		err      error
+		decision authzauditpb.AuthzDecision_Decision
+		reason   authzauditpb.AuthzDecision_Reason
+		code     int32
+		event    string
+	}{
+		{name: "allowed", allowed: true, decision: authzauditpb.AuthzDecision_DECISION_ALLOWED, reason: authzauditpb.AuthzDecision_REASON_ALLOWED, code: 200, event: EventTypeAuthzAllowed},
+		{name: "denied", decision: authzauditpb.AuthzDecision_DECISION_DENIED, reason: authzauditpb.AuthzDecision_REASON_DENIED, code: 403, event: EventTypeAuthzDenied},
+		{name: "unavailable", err: stderrors.Join(ErrUnavailable, providerCause), decision: authzauditpb.AuthzDecision_DECISION_ERROR, reason: authzauditpb.AuthzDecision_REASON_UNAVAILABLE, code: 503, event: EventTypeAuthzError},
+		{name: "internal", err: providerCause, decision: authzauditpb.AuthzDecision_DECISION_ERROR, reason: authzauditpb.AuthzDecision_REASON_INTERNAL, code: 500, event: EventTypeAuthzError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auditor := &captureAuditor{}
+			_, _ = invoke(t, Server(&fakeAuthorizer{allowed: tt.allowed, err: tt.err}, rules(checkRule()), subject("user:alice"), WithAuditor(auditor)), serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"}, nil)
+			events := auditor.all()
+			if len(events) != 1 {
+				t.Fatalf("audit events = %d", len(events))
+			}
+			event := events[0]
+			if event.Type() != tt.event || event.Subject() != "document:doc-1" {
+				t.Fatalf("event = (%q, %q)", event.Type(), event.Subject())
+			}
+			if _, exists := event.Extensions()["authid"]; exists {
+				t.Fatalf("authid extension exists: %v", event.Extensions())
+			}
+			decision := decodeDecision(t, event)
+			if decision.Decision != tt.decision || decision.Reason != tt.reason || decision.Code != tt.code || decision.Subject != "user:alice" || decision.Action != "read" || decision.ResourceType != "document" || decision.ResourceId != "doc-1" {
+				t.Fatalf("decision = %#v", decision)
+			}
+			if bytes.Contains(event.Data(), []byte("provider-secret")) {
+				t.Fatalf("audit leaked provider cause: %q", event.Data())
+			}
+		})
+	}
+}
 
-func TestServer_FailOpenOnMissingRule_PassesThroughAndAlerts(t *testing.T) {
-	var alerted *string
-	mw := Server(nil,
-		WithFailOpenOnMissingRule(func(ctx context.Context, operation string) {
-			alerted = &operation
-		}),
-	)
-
+func TestServerAuditFailureDoesNotChangeDecision(t *testing.T) {
+	auditor := &captureAuditor{err: stderrors.New("audit unavailable")}
 	called := false
-	handler := mw(func(ctx context.Context, req any) (any, error) {
+	_, err := invoke(t, Server(&fakeAuthorizer{allowed: true}, rules(checkRule()), subject("user:alice"), WithAuditor(auditor)), serverContext(testOperation), &wrapperspb.StringValue{Value: "doc-1"}, func(context.Context, any) (any, error) {
 		called = true
-		return "ok", nil
-	})
-
-	ctx := transportCtx(testOp)
-	resp, err := handler(ctx, nil)
-	if err != nil {
-		t.Fatalf("expected pass-through, got err=%v", err)
-	}
-	if !called {
-		t.Fatal("handler must be called when fail-open is on")
-	}
-	if resp != "ok" {
-		t.Errorf("resp = %v, want ok", resp)
-	}
-	if alerted == nil || *alerted != testOp {
-		t.Errorf("alert callback not invoked with operation %q (got %v)", testOp, alerted)
-	}
-}
-
-func TestServer_NoFailOpen_StillFailsClosed(t *testing.T) {
-	mw := Server(nil) // no rules, no fail-open option
-	handler := mw(func(ctx context.Context, req any) (any, error) {
-		t.Fatal("handler must not be called by default")
 		return nil, nil
 	})
-
-	ctx := transportCtx(testOp)
-	_, err := handler(ctx, nil)
-	if err == nil {
-		t.Fatal("expected fail-closed error for missing rule")
+	if err != nil || !called {
+		t.Fatalf("called = %v, error = %v", called, err)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: resolveResource
-// ---------------------------------------------------------------------------
-
-func TestResolveResource_ResourceIdField_Empty_UsesDefault(t *testing.T) {
-	rule := &authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, ResourceType: "platform", ResourceIdField: ""}
-	resourceType, resourceID, err := resolveResource(rule, nil, "default")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resourceType != "platform" {
-		t.Errorf("resourceType = %q, want platform", resourceType)
-	}
-	if resourceID != "default" {
-		t.Errorf("resourceID = %q, want default", resourceID)
-	}
-}
-
-func TestResolveResource_ResourceIdField_Empty_CustomDefault(t *testing.T) {
-	rule := &authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, ResourceType: "platform", ResourceIdField: ""}
-	resourceType, resourceID, err := resolveResource(rule, nil, "global")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resourceType != "platform" {
-		t.Errorf("resourceType = %q, want platform", resourceType)
-	}
-	if resourceID != "global" {
-		t.Errorf("resourceID = %q, want global", resourceID)
-	}
-}
-
-func TestResolveResource_ResourceIdField_Set_ExtractedFromProto(t *testing.T) {
-	rule := &authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, ResourceType: "user", ResourceIdField: "value"}
-	req := &wrapperspb.StringValue{Value: "user-abc-123"}
-
-	resourceType, resourceID, err := resolveResource(rule, req, "default")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resourceType != "user" {
-		t.Errorf("resourceType = %q, want user", resourceType)
-	}
-	if resourceID != "user-abc-123" {
-		t.Errorf("resourceID = %q, want user-abc-123", resourceID)
-	}
-}
-
-func TestResolveResource_ResourceIdField_NotFound_Error(t *testing.T) {
-	rule := &authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, ResourceType: "user", ResourceIdField: "nonexistent_field"}
-	req := &wrapperspb.StringValue{Value: "user-abc-123"}
-
-	_, _, err := resolveResource(rule, req, "default")
-	if err == nil {
-		t.Fatal("expected error for nonexistent field")
-	}
-}
-
-func TestResolveResource_ResourceType_Empty_Error(t *testing.T) {
-	rule := &authzpb.AuthzRule{Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, ResourceType: ""}
-	_, _, err := resolveResource(rule, nil, "default")
-	if err == nil {
-		t.Fatal("expected error for empty ResourceType")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: extractProtoField
-// ---------------------------------------------------------------------------
-
-func TestExtractProtoField_NonProtoRequest_Error(t *testing.T) {
-	_, err := extractProtoField("not a proto message", "id")
-	if err == nil {
-		t.Fatal("expected error for non-proto request")
-	}
-}
-
-func TestExtractProtoField_EmptyFieldValue_Error(t *testing.T) {
-	req := &wrapperspb.StringValue{Value: ""} // empty value
-	_, err := extractProtoField(req, "value")
-	if err == nil {
-		t.Fatal("expected error for empty field value")
-	}
-}
-
-func TestExtractProtoField_DotPath_NestedScalar(t *testing.T) {
-	req := &descriptorpb.FileDescriptorProto{
-		Options: &descriptorpb.FileOptions{GoPackage: proto.String("example.com/pkg")},
-	}
+func TestExtractProtoFieldNestedScalar(t *testing.T) {
+	req := &descriptorpb.FileDescriptorProto{Options: &descriptorpb.FileOptions{GoPackage: proto.String("example.com/pkg")}}
 	got, err := extractProtoField(req, "options.go_package")
-	if err != nil {
-		t.Fatalf("extractProtoField err = %v", err)
-	}
-	if got != "example.com/pkg" {
-		t.Errorf("got %q, want example.com/pkg", got)
+	if err != nil || got != "example.com/pkg" {
+		t.Fatalf("value = %q, error = %v", got, err)
 	}
 }
 
-func TestExtractProtoField_DotPath_MissingSegment(t *testing.T) {
-	req := &descriptorpb.FileDescriptorProto{
-		Options: &descriptorpb.FileOptions{GoPackage: proto.String("x")},
+func decodeDecision(t *testing.T, event cloudevents.Event) *authzauditpb.AuthzDecision {
+	t.Helper()
+	decision := new(authzauditpb.AuthzDecision)
+	if err := proto.Unmarshal(event.Data(), decision); err != nil {
+		t.Fatal(err)
 	}
-	_, err := extractProtoField(req, "options.missing")
-	if err == nil {
-		t.Fatal("expected error for missing nested segment")
-	}
-}
-
-func TestExtractProtoField_DotPath_TerminatesOnMessage_Errors(t *testing.T) {
-	req := &descriptorpb.FileDescriptorProto{
-		Options: &descriptorpb.FileOptions{GoPackage: proto.String("x")},
-	}
-	_, err := extractProtoField(req, "options")
-	if err == nil {
-		t.Fatal("expected error when path terminus is a message, not a scalar")
-	}
-}
-
-func TestExtractProtoField_TopLevel_StillWorks(t *testing.T) {
-	req := &wrapperspb.StringValue{Value: "user-abc"}
-	got, err := extractProtoField(req, "value")
-	if err != nil {
-		t.Fatalf("err = %v", err)
-	}
-	if got != "user-abc" {
-		t.Errorf("got %q, want user-abc", got)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: WithDefaultResourceID
-// ---------------------------------------------------------------------------
-
-func TestServer_WithDefaultResourceID(t *testing.T) {
-	fa := &fakeAuthorizer{allowed: true}
-	mw := Server(fa,
-		testRules(map[string]*authzpb.AuthzRule{
-			testOp: {Mode: authzpb.AuthzMode_AUTHZ_MODE_CHECK, Action: "admin", ResourceType: "platform"},
-		}),
-		WithSubjectFunc(staticSubjectFunc("user:123")),
-		WithDefaultResourceID("global"),
-	)
-
-	handler := mw(func(ctx context.Context, req any) (any, error) { return nil, nil })
-	ctx := transportCtx(testOp)
-	if _, err := handler(ctx, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	req := fa.lastRequest()
-	if req.ResourceID != "global" {
-		t.Errorf("ResourceID = %q, want global", req.ResourceID)
-	}
+	return decision
 }

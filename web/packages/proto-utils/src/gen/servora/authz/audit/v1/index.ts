@@ -38,39 +38,28 @@ function encodeMultiSegmentPath(value: unknown): string {
     .join('/');
 }
 
-// AuthzDecision is the CloudEvents data payload shared by all three authz
-// audit event types:
-// - servora.authz.allowed.v1
-// - servora.authz.denied.v1
-// - servora.authz.error.v1
-// The Decision enum distinguishes outcomes so consumers can branch on data
-// without re-parsing the CloudEvents type attribute.
+// AuthzDecision is the typed payload shared by authorization decision events.
 export type AuthzDecision = {
-  // action is the authz action being checked (e.g. "read", "delete").
   action?: string;
-  // backend identifies the authorizer implementation (e.g. "openfga", "casbin").
-  backend?: string;
-  // code is the HTTP/gRPC status code.
   code?: number;
   decision?: AuthzDecision_Decision;
-  // message is a sanitised description.
-  message?: string;
-  // reason is an optional Kratos-style reason code (e.g. "AUTHZ_DENIED").
-  reason?: string;
-  // resource_id is the resolved resource identifier.
+  reason?: AuthzDecision_Reason;
   resourceId?: string;
-  // resource_type is the resource type from the authz rule (e.g. "document").
   resourceType?: string;
+  subject?: string;
 };
 
-// Decision enumerates the three possible authz outcomes.
 export type AuthzDecision_Decision =
-  // ALLOWED — authorizer.Check returned (true, nil).
   | 'DECISION_ALLOWED'
-  // DENIED — authorizer.Check returned (false, nil): policy explicitly denied.
   | 'DECISION_DENIED'
-  // ERROR — authorizer.Check returned (_, err != nil): check itself failed.
   | 'DECISION_ERROR'
   | 'DECISION_UNSPECIFIED';
+export type AuthzDecision_Reason =
+  | 'REASON_ALLOWED'
+  | 'REASON_DENIED'
+  | 'REASON_INTERNAL'
+  | 'REASON_INVALID_REQUEST'
+  | 'REASON_UNAVAILABLE'
+  | 'REASON_UNSPECIFIED';
 
 // @@protoc_insertion_point(typescript-http-eof)

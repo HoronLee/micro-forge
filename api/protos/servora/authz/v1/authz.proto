@@ -25,8 +25,8 @@ message AuthzRule {
   string action = 2;
   // Resource type, e.g. "platform", "video", "server".
   string resource_type = 3;
-  // Proto field name in the request that carries the resource ID, e.g. "id".
-  // When empty, a static default resource ID is used (singleton/platform-level checks).
+  // Required proto field path in the request that carries the resource ID, e.g. "id".
+  // The path must resolve to a singular scalar field.
   string resource_id_field = 4;
 }
 

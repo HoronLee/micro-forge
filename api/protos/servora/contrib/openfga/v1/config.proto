@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package servora.contrib.openfga.v1;
+
+import "servora/conf/v1/annotations.proto";
+
+option go_package = "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/openfga/v1;openfgaconfpb";
+
+message OpenFGA {
+  option (servora.conf.v1.section) = {
+    key: "openfga"
+    optional: true
+  };
+
+  string api_url = 1 [(servora.conf.v1.field) = {required: true}];
+  string store_id = 2 [(servora.conf.v1.field) = {required: true}];
+  string model_id = 3;
+  string api_token = 4;
+}

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	kratos "github.com/go-kratos/kratos/v3"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	kratos "github.com/go-kratos/kratos/v3"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"

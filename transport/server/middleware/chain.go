@@ -29,25 +29,15 @@ import (
 //
 // 使用示例：
 //
-//	import (
-//	    "github.com/Servora-Kit/servora/security/authn/jwt"
-//	    pkgmw "github.com/Servora-Kit/servora/transport/server/middleware"
-//	)
-//
 //	httpLogger := logger.With(l, "http/server/my-service")
 //	ms := pkgmw.NewChainBuilder(httpLogger).
 //	    WithTrace(trace).
 //	    WithMetrics(mtc).
 //	    Build()
-//	// 业务通过 builtin append 追加 authn/authz wrapper
-//	ms = append(ms, authn.Server(authn.Multi(authn.Named(jwt.Scheme, jwt.NewAuthenticator(jwt.WithVerifier(v))))), authz.Server(fgaAuth))
-//
-// 自实现 Authenticator 的高级用法（非 jwt 载体或自定义引擎）：
-//
-//	// 单引擎：直接传给 authn.Server
-//	ms = append(ms, authn.Server(myCustomAuth))
-//	// 多引擎并存：用 authn.Named + authn.Multi 包一层
-//	ms = append(ms, authn.Server(authn.Multi(authn.Named("custom", myCustomAuth))))
+//	ms = append(ms,
+//	    authn.Server(authenticators, authn.WithRulesFuncs(authnRules)),
+//	    authz.Server(authorizer, authz.WithRulesFuncs(authzRules)),
+//	)
 //
 // 注意：
 //   - HTTP 和 gRPC 共享同一个 ChainBuilder，通过传入不同的 Logger 区分

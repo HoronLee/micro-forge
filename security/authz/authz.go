@@ -1,208 +1,262 @@
-// Package authz provides a generic Kratos middleware for authorization.
-// It is engine-agnostic: any Authorizer implementation can be injected.
-//
-// Example usage:
-//
-//	import (
-//	    pkgauthz "github.com/Servora-Kit/servora/security/authz"
-//	    fgaengine "github.com/Servora-Kit/servora/security/authz/openfga"
-//	)
-//
-//	mw = append(mw, pkgauthz.Server(
-//	    fgaengine.NewAuthorizer(fgaClient),
-//	    pkgauthz.WithRulesFuncs(iamv1.AuthzRules),
-//	    pkgauthz.WithSubjectFunc(mySubjectExtractor),
-//	))
+// Package authz provides engine-neutral authorization contracts and Kratos
+// server middleware.
 package authz
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
-	"time"
+	"log/slog"
+	"reflect"
 
-	"github.com/go-kratos/kratos/v3/errors"
-	"github.com/go-kratos/kratos/v3/middleware"
-	"github.com/go-kratos/kratos/v3/transport"
-
+	authnauditpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/audit/v1"
+	authnpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/v1"
+	authzauditpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/audit/v1"
 	authzpb "github.com/Servora-Kit/servora/api/gen/go/servora/authz/v1"
 	"github.com/Servora-Kit/servora/obs/audit"
+	"github.com/Servora-Kit/servora/security/authn"
+	"github.com/go-kratos/kratos/v3/middleware"
+	"github.com/go-kratos/kratos/v3/transport"
 )
 
-// Authorizer is the single-method interface for authorization decisions.
-// Implementations may target any backend (OpenFGA, SpiceDB, Cedar, OPA, etc.).
-type Authorizer interface {
-	// Check returns whether the request described by req is authorized.
-	Check(ctx context.Context, req CheckRequest) (allowed bool, err error)
+// Resource identifies one authorization target.
+type Resource struct {
+	Type string
+	ID   string
 }
 
-// CheckRequest describes a single authorization check.
+// CheckRequest describes one engine-neutral authorization decision.
+// Subject must be a stable, non-replayable identity identifier, never a credential.
 type CheckRequest struct {
-	Subject      string
-	Action       string
-	ResourceType string
-	ResourceID   string
-	Attributes   map[string]any
+	Subject    string
+	Action     string
+	Resource   Resource
+	Attributes map[string]any
 }
 
-// Option configures the Server middleware.
+// Authorizer is the single-method authorization contract.
+type Authorizer interface {
+	Check(context.Context, CheckRequest) (bool, error)
+}
+
+// BatchAuthorizer is the optional ordered batch-check capability.
+type BatchAuthorizer interface {
+	Authorizer
+	BatchCheck(context.Context, []CheckRequest) ([]bool, error)
+}
+
+// Lister is the optional capability for listing allowed resource IDs.
+type Lister interface {
+	Authorizer
+	ListAllowed(ctx context.Context, subject, action, resourceType string) ([]string, error)
+}
+
+// ErrUnavailable identifies a temporarily unavailable authorization dependency.
+var ErrUnavailable = stderrors.New("authz: unavailable")
+
+var (
+	errMissingSubject   = stderrors.New("authz: trusted subject is missing")
+	errMissingTransport = stderrors.New("authz: server transport is missing")
+)
+
+// Option configures Server.
 type Option func(*serverConfig)
 
 type serverConfig struct {
-	rules              map[string]*authzpb.AuthzRule
-	defaultResourceID  string
-	checkTimeout       time.Duration
-	missingRuleAlertFn func(ctx context.Context, operation string)
-	subjectFunc        func(context.Context) (string, bool)
-	auditor            audit.Auditor
+	rules       map[string]*authzpb.AuthzRule
+	subjectFunc func(context.Context) (string, bool)
+	auditor     audit.Auditor
+	logger      *slog.Logger
 }
 
-// WithRulesFuncs merges the rule maps returned by one or more generator functions
-// (e.g. userpb.AuthzRules, iampb.AuthzRules) into a single rule set.
-// Later entries take precedence on key conflicts.
+type compiledRule struct {
+	mode            authzpb.AuthzMode
+	action          string
+	resourceType    string
+	resourceIDField string
+}
+
+// WithRulesFuncs merges generated rule tables. Later entries win.
 func WithRulesFuncs(fns ...func() map[string]*authzpb.AuthzRule) Option {
 	return func(cfg *serverConfig) {
 		for _, fn := range fns {
 			if fn == nil {
 				continue
 			}
-			rules := fn()
-			if len(rules) == 0 {
-				continue
-			}
-			if cfg.rules == nil {
-				cfg.rules = make(map[string]*authzpb.AuthzRule, len(rules))
-			}
-			for op, rule := range rules {
+			for operation, rule := range fn() {
 				if rule == nil {
 					continue
 				}
-				cfg.rules[op] = rule
+				if cfg.rules == nil {
+					cfg.rules = make(map[string]*authzpb.AuthzRule)
+				}
+				cfg.rules[operation] = rule
 			}
 		}
 	}
 }
 
-// WithDefaultResourceID overrides the fallback resource ID used when
-// resource_id_field is empty. Defaults to "default".
-func WithDefaultResourceID(id string) Option {
-	return func(cfg *serverConfig) { cfg.defaultResourceID = id }
-}
-
-// WithCheckTimeout bounds the time spent in Authorizer.Check on each request.
-// Zero (default) disables the deadline — the upstream context applies.
-//
-// This protects business-RPC latency from a slow authorization backend.
-func WithCheckTimeout(d time.Duration) Option {
-	return func(cfg *serverConfig) { cfg.checkTimeout = d }
-}
-
-// WithFailOpenOnMissingRule changes the missing-rule policy from fail-closed
-// (default — return AUTHZ_NO_RULE 403) to fail-open: the handler is called,
-// and the alertFn callback is invoked so the gap is visible (oncall page,
-// Slack, log warning, etc.).
-//
-// Use during development or staged rollouts. NEVER use in production for
-// security-sensitive services.
-func WithFailOpenOnMissingRule(alertFn func(ctx context.Context, operation string)) Option {
-	return func(cfg *serverConfig) { cfg.missingRuleAlertFn = alertFn }
-}
-
-// WithSubjectFunc sets the function used to extract the subject string from
-// the request context. The function should return the subject identifier and
-// a boolean indicating whether the subject was found. When not set or when
-// the function returns false, the middleware returns 403 AUTHZ_DENIED.
+// WithSubjectFunc overrides the standard authn.SubjectFrom reader.
 func WithSubjectFunc(fn func(context.Context) (string, bool)) Option {
 	return func(cfg *serverConfig) { cfg.subjectFunc = fn }
 }
 
-// Server returns a Kratos middleware that performs authorization checks.
-//
-// Behavior:
-//   - No transport in context → passthrough (non-server calls).
-//   - No rule for operation → fail-closed (403 AUTHZ_NO_RULE).
-//   - No rule + WithFailOpenOnMissingRule set → alertFn invoked, handler called.
-//   - AUTHZ_MODE_NONE → skip (public endpoint).
-//   - AUTHZ_MODE_CHECK, no subject → 403 AUTHZ_DENIED.
-//   - AUTHZ_MODE_CHECK, nil authorizer → 503 AUTHZ_UNAVAILABLE.
-//   - AUTHZ_MODE_CHECK, authorizer returned (true, nil) → handler called.
-//     if WithAuditor is set, emits servora.authz.allowed.v1.
-//   - AUTHZ_MODE_CHECK, authorizer returned (false, nil) → 403 AUTHZ_DENIED;
-//     if WithAuditor is set, emits servora.authz.denied.v1.
-//   - AUTHZ_MODE_CHECK, authorizer returned (_, err) → 503 AUTHZ_CHECK_FAILED;
-//     if WithAuditor is set, emits servora.authz.error.v1.
+// WithLogger configures root middleware diagnostics. It does not inject the
+// logger into Authorizer implementations.
+func WithLogger(logger *slog.Logger) Option {
+	return func(cfg *serverConfig) { cfg.logger = logger }
+}
+
+// Server constructs authorization middleware and validates static wiring
+// before returning it.
 func Server(authorizer Authorizer, opts ...Option) middleware.Middleware {
-	cfg := &serverConfig{defaultResourceID: "default"}
-	for _, o := range opts {
-		o(cfg)
+	if isNilAuthorizer(authorizer) {
+		panic("authz: authorizer is nil")
 	}
+
+	cfg := &serverConfig{subjectFunc: authn.SubjectFrom}
+	for index, opt := range opts {
+		if opt == nil {
+			panic(fmt.Sprintf("authz: option[%d] is nil", index))
+		}
+		opt(cfg)
+		if cfg.subjectFunc == nil {
+			panic(fmt.Sprintf("authz: option[%d] set subject function to nil", index))
+		}
+	}
+	compiledRules := compileRules(cfg.rules)
 
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			tr, ok := transport.FromServerContext(ctx)
-			if !ok {
-				return handler(ctx, req)
+			if !ok || tr == nil {
+				logAuthorization(ctx, cfg.logger, slog.LevelError, "", CheckRequest{}, authzauditpb.AuthzDecision_REASON_INTERNAL)
+				return nil, authzpb.ErrorAuthzErrorReasonInternal("internal authorization error").WithCause(concealAuthorizationCause(errMissingTransport))
 			}
 
 			operation := tr.Operation()
-			rule, found := cfg.rules[operation]
-			if !found || rule == nil {
-				if cfg.missingRuleAlertFn != nil {
-					cfg.missingRuleAlertFn(ctx, operation)
-					return handler(ctx, req)
-				}
-				return nil, errors.Forbidden("AUTHZ_NO_RULE",
-					fmt.Sprintf("no authorization rule for operation %s", operation))
+			rule, found := compiledRules[operation]
+			if !found {
+				cause := fmt.Errorf("authz: no authorization rule for operation %q", operation)
+				logAuthorization(ctx, cfg.logger, slog.LevelError, operation, CheckRequest{}, authzauditpb.AuthzDecision_REASON_INTERNAL)
+				return nil, authzpb.ErrorAuthzErrorReasonInternal("internal authorization error").WithCause(concealAuthorizationCause(cause))
 			}
-
-			if rule.GetMode() == authzpb.AuthzMode_AUTHZ_MODE_NONE {
+			if rule.mode == authzpb.AuthzMode_AUTHZ_MODE_NONE {
 				return handler(ctx, req)
 			}
 
-			subject, ok := "", false
-			if cfg.subjectFunc != nil {
-				subject, ok = cfg.subjectFunc(ctx)
-			}
+			subject, ok := cfg.subjectFunc(ctx)
 			if !ok || subject == "" {
-				return nil, errors.Forbidden("AUTHZ_DENIED", "authentication required")
+				logAuthorization(ctx, cfg.logger, slog.LevelWarn, operation, CheckRequest{}, authnauditpb.AuthnFailureReason_AUTHN_FAILURE_REASON_NO_CREDENTIALS)
+				return nil, authnpb.ErrorAuthnErrorReasonUnauthenticated("authentication failed").WithCause(concealAuthorizationCause(errMissingSubject))
 			}
 
-			if authorizer == nil {
-				return nil, errors.ServiceUnavailable("AUTHZ_UNAVAILABLE", "authorization service not available")
+			checkRequest := CheckRequest{
+				Subject: subject,
+				Action:  rule.action,
+				Resource: Resource{
+					Type: rule.resourceType,
+				},
 			}
-
-			resourceType, resourceID, err := resolveResource(rule, req, cfg.defaultResourceID)
+			resource, err := resolveResource(rule, req)
 			if err != nil {
-				return nil, errors.BadRequest("AUTHZ_BAD_REQUEST",
-					fmt.Sprintf("cannot resolve authorization target: %v", err))
+				checkRequest.Resource = resource
+				emitAuthzDecision(ctx, cfg.auditor, checkRequest, authzauditpb.AuthzDecision_DECISION_ERROR, authzauditpb.AuthzDecision_REASON_INVALID_REQUEST, 400)
+				logAuthorization(ctx, cfg.logger, slog.LevelWarn, operation, checkRequest, authzauditpb.AuthzDecision_REASON_INVALID_REQUEST)
+				return nil, authzpb.ErrorAuthzErrorReasonInvalidRequest("invalid authorization request").WithCause(concealAuthorizationCause(err))
 			}
-			action := rule.GetAction()
+			checkRequest.Resource = resource
 
-			checkCtx := ctx
-			if cfg.checkTimeout > 0 {
-				var cancel context.CancelFunc
-				checkCtx, cancel = context.WithTimeout(ctx, cfg.checkTimeout)
-				defer cancel()
-			}
-
-			allowed, checkErr := authorizer.Check(checkCtx, CheckRequest{
-				Subject:      subject,
-				Action:       action,
-				ResourceType: resourceType,
-				ResourceID:   resourceID,
-			})
-
+			allowed, checkErr := authorizer.Check(ctx, checkRequest)
 			if checkErr != nil {
-				emitAuthzError(ctx, cfg.auditor, subject, action, resourceType, resourceID, checkErr)
-				return nil, errors.ServiceUnavailable("AUTHZ_CHECK_FAILED",
-					fmt.Sprintf("authorization check failed: %v", checkErr))
+				reason := authzauditpb.AuthzDecision_REASON_INTERNAL
+				code := int32(500)
+				if stderrors.Is(checkErr, ErrUnavailable) {
+					reason = authzauditpb.AuthzDecision_REASON_UNAVAILABLE
+					code = 503
+				}
+				emitAuthzDecision(ctx, cfg.auditor, checkRequest, authzauditpb.AuthzDecision_DECISION_ERROR, reason, code)
+				logAuthorization(ctx, cfg.logger, slog.LevelError, operation, checkRequest, reason)
+				return nil, authorizationError(reason, checkErr)
 			}
 			if !allowed {
-				emitAuthzDenied(ctx, cfg.auditor, subject, action, resourceType, resourceID)
-				return nil, errors.Forbidden("AUTHZ_DENIED", "insufficient permissions")
+				emitAuthzDecision(ctx, cfg.auditor, checkRequest, authzauditpb.AuthzDecision_DECISION_DENIED, authzauditpb.AuthzDecision_REASON_DENIED, 403)
+				logAuthorization(ctx, cfg.logger, slog.LevelWarn, operation, checkRequest, authzauditpb.AuthzDecision_REASON_DENIED)
+				return nil, authzpb.ErrorAuthzErrorReasonDenied("permission denied")
 			}
 
-			emitAuthzAllowed(ctx, cfg.auditor, subject, action, resourceType, resourceID)
+			emitAuthzDecision(ctx, cfg.auditor, checkRequest, authzauditpb.AuthzDecision_DECISION_ALLOWED, authzauditpb.AuthzDecision_REASON_ALLOWED, 200)
+			logAuthorization(ctx, cfg.logger, slog.LevelInfo, operation, checkRequest, authzauditpb.AuthzDecision_REASON_ALLOWED)
 			return handler(ctx, req)
 		}
 	}
+}
+
+func compileRules(rules map[string]*authzpb.AuthzRule) map[string]compiledRule {
+	compiled := make(map[string]compiledRule, len(rules))
+	for operation, rule := range rules {
+		compiled[operation] = compiledRule{
+			mode:            rule.GetMode(),
+			action:          rule.GetAction(),
+			resourceType:    rule.GetResourceType(),
+			resourceIDField: rule.GetResourceIdField(),
+		}
+	}
+	return compiled
+}
+
+func isNilAuthorizer(authorizer Authorizer) bool {
+	if authorizer == nil {
+		return true
+	}
+	value := reflect.ValueOf(authorizer)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
+}
+
+func authorizationError(reason authzauditpb.AuthzDecision_Reason, cause error) error {
+	concealed := concealAuthorizationCause(cause)
+	switch reason {
+	case authzauditpb.AuthzDecision_REASON_UNAVAILABLE:
+		return authzpb.ErrorAuthzErrorReasonUnavailable("authorization service unavailable").WithCause(concealed)
+	default:
+		return authzpb.ErrorAuthzErrorReasonInternal("internal authorization error").WithCause(concealed)
+	}
+}
+
+type concealedAuthorizationCause struct {
+	cause error
+}
+
+func (e concealedAuthorizationCause) Error() string { return "authorization cause withheld" }
+func (e concealedAuthorizationCause) Unwrap() error { return e.cause }
+
+func concealAuthorizationCause(cause error) error {
+	if cause == nil {
+		return nil
+	}
+	return concealedAuthorizationCause{cause: cause}
+}
+
+func logAuthorization(
+	ctx context.Context,
+	logger *slog.Logger,
+	level slog.Level,
+	operation string,
+	req CheckRequest,
+	reason fmt.Stringer,
+) {
+	if logger == nil {
+		return
+	}
+	logger.LogAttrs(ctx, level, "authorization decision",
+		slog.String("operation", operation),
+		slog.String("action", req.Action),
+		slog.String("resource_type", req.Resource.Type),
+		slog.String("reason", reason.String()),
+	)
 }

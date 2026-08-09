@@ -57,5 +57,14 @@ export type AuthnRule_Mode =
   | 'MODE_REQUIRED'
   // 未指定，等价"未写注解"：私有 + 框架默认引擎（fail-closed 默认）。
   | 'MODE_UNSPECIFIED';
+// AuthnErrorReason defines stable client-visible authentication failures.
+export type AuthnErrorReason =
+  // The authentication contract or framework invariant was violated.
+  | 'AUTHN_ERROR_REASON_INTERNAL'
+  // Authentication credentials are absent or rejected.
+  | 'AUTHN_ERROR_REASON_UNAUTHENTICATED'
+  // An authentication dependency is temporarily unavailable.
+  | 'AUTHN_ERROR_REASON_UNAVAILABLE'
+  | 'AUTHN_ERROR_REASON_UNSPECIFIED';
 
 // @@protoc_insertion_point(typescript-http-eof)

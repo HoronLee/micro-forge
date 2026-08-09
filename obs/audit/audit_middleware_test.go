@@ -174,13 +174,12 @@ func TestMiddleware_HandlerErrorPropagated(t *testing.T) {
 		t.Errorf("expected handler error to be propagated, got: %v", err)
 	}
 
-	// Error should also be captured in the event.
 	events := ma.Events()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	if v, ok := events[0].Extensions()["errormessage"]; !ok || v != "handler failed" {
-		t.Errorf("errormessage = %v, want 'handler failed'", v)
+	if v, ok := events[0].Extensions()[extErrorMessage]; !ok || v != "handler failed" {
+		t.Errorf("errormessage = %v, want %q", v, "handler failed")
 	}
 }
 

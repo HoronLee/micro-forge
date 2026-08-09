@@ -1,761 +1,428 @@
 package authn
 
 import (
+	"bytes"
 	"context"
-	"errors"
+	"encoding/json"
+	stderrors "errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
+	authnauditpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/audit/v1"
+	authnpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/v1"
+	"github.com/Servora-Kit/servora/obs/audit"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	kerrors "github.com/go-kratos/kratos/v3/errors"
 	"github.com/go-kratos/kratos/v3/middleware"
 	"github.com/go-kratos/kratos/v3/transport"
-
-	authnpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/v1"
+	"google.golang.org/protobuf/proto"
 )
 
-// readFile is a thin os.ReadFile wrapper kept package-local so the structural
-// guard tests do not pull in external file-reading helpers.
-func readFile(path string) ([]byte, error) { return os.ReadFile(path) }
+type fakeTransport struct{ operation string }
 
-// ---------------------------------------------------------------------------
-// Test fixtures
-// ---------------------------------------------------------------------------
-
-// fakeTransport implements transport.Transporter; only Operation matters for
-// the dispatcher routing tests.
-type fakeTransport struct {
-	op string
-}
-
-func (f *fakeTransport) Kind() transport.Kind            { return transport.KindHTTP }
-func (f *fakeTransport) Endpoint() string                { return "" }
-func (f *fakeTransport) Operation() string               { return f.op }
-func (f *fakeTransport) RequestHeader() transport.Header { return &fakeHeader{} }
-func (f *fakeTransport) ReplyHeader() transport.Header   { return &fakeHeader{} }
+func (*fakeTransport) Kind() transport.Kind            { return transport.KindHTTP }
+func (*fakeTransport) Endpoint() string                { return "" }
+func (t *fakeTransport) Operation() string             { return t.operation }
+func (*fakeTransport) RequestHeader() transport.Header { return fakeHeader{} }
+func (*fakeTransport) ReplyHeader() transport.Header   { return fakeHeader{} }
 
 type fakeHeader struct{}
 
-func (h *fakeHeader) Get(key string) string      { return "" }
-func (h *fakeHeader) Set(key, value string)      {}
-func (h *fakeHeader) Add(key, value string)      {}
-func (h *fakeHeader) Keys() []string             { return nil }
-func (h *fakeHeader) Values(key string) []string { return nil }
+func (fakeHeader) Get(string) string      { return "" }
+func (fakeHeader) Set(string, string)     {}
+func (fakeHeader) Add(string, string)     {}
+func (fakeHeader) Keys() []string         { return nil }
+func (fakeHeader) Values(string) []string { return nil }
 
-// transportCtx builds a server-side ctx with a fake transport.
-func transportCtx(op string) context.Context {
-	return transport.NewServerContext(context.Background(), &fakeTransport{op: op})
-}
-
-// fakeAuthenticator records its invocation count and returns configured
-// (ctx, err). Used everywhere the dispatcher (`Server`) is exercised
-// without a Multi decorator.
 type fakeAuthenticator struct {
-	called    int
-	returnCtx context.Context // if nil, returns the input ctx on success
-	returnErr error
-
-	// captureCtx, if non-nil, records the ctx received by Authenticate
-	// so per-test assertions can inspect ctx channels installed by Server.
-	captureCtx *context.Context
+	scheme      Scheme
+	schemeCalls int
+	calls       int
+	loggerSets  int
+	auth        Authentication
+	err         error
 }
 
-func (f *fakeAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
-	f.called++
-	if f.captureCtx != nil {
-		*f.captureCtx = ctx
-	}
-	if f.returnErr != nil {
-		return ctx, f.returnErr
-	}
-	if f.returnCtx != nil {
-		return f.returnCtx, nil
-	}
-	return ctx, nil
+func (a *fakeAuthenticator) Scheme() Scheme {
+	a.schemeCalls++
+	return a.scheme
 }
 
-// Compile-time guard: minimal Authenticator (single method only).
-type minimalAuthenticator struct{}
-
-func (minimalAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
-	return ctx, nil
+func (a *fakeAuthenticator) Authenticate(context.Context) (Authentication, error) {
+	a.calls++
+	return a.auth, a.err
 }
 
-var _ Authenticator = (*minimalAuthenticator)(nil)
-var _ Authenticator = (*fakeAuthenticator)(nil)
+// SetLogger deliberately resembles the rejected optional-injection capability.
+// Server must never discover or invoke it dynamically.
+func (a *fakeAuthenticator) SetLogger(*slog.Logger) { a.loggerSets++ }
 
-// fakeAuditor captures CloudEvents emitted via WithAuditor.
 type fakeAuditor struct {
 	events []cloudevents.Event
+	err    error
 }
 
 func (a *fakeAuditor) Emit(_ context.Context, event cloudevents.Event) error {
 	a.events = append(a.events, event)
-	return nil
+	return a.err
 }
 
-// ---------------------------------------------------------------------------
-// Server: MODE_PUBLIC passthrough
-// ---------------------------------------------------------------------------
+func authnContext(operation string) context.Context {
+	return transport.NewServerContext(context.Background(), &fakeTransport{operation: operation})
+}
 
-func TestServer_ModePublicPassthrough(t *testing.T) {
-	auth := &fakeAuthenticator{returnErr: errors.New("must not be called")}
-	rules := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
-			"/svc/Healthz": {Mode: authnpb.AuthnRule_MODE_PUBLIC},
-		}
-	}
+func rules(entries map[string]*authnpb.AuthnRule) func() map[string]*authnpb.AuthnRule {
+	return func() map[string]*authnpb.AuthnRule { return entries }
+}
 
-	mw := Server(auth, WithRulesFuncs(rules))
-	handler := mw(func(_ context.Context, _ any) (any, error) {
+func invoke(t *testing.T, mw middleware.Middleware, ctx context.Context) (context.Context, error) {
+	t.Helper()
+	var handlerContext context.Context
+	handler := mw(func(ctx context.Context, _ any) (any, error) {
+		handlerContext = ctx
 		return "ok", nil
 	})
+	_, err := handler(ctx, nil)
+	return handlerContext, err
+}
 
-	ctx := transportCtx("/svc/Healthz")
-	resp, err := handler(ctx, nil)
+func TestAuthenticatorInterfaceShape(t *testing.T) {
+	typeOf := reflect.TypeOf((*Authenticator)(nil)).Elem()
+	if typeOf.NumMethod() != 2 {
+		t.Fatalf("Authenticator methods = %d, want 2", typeOf.NumMethod())
+	}
+	for _, name := range []string{"Authenticate", "Scheme"} {
+		if _, ok := typeOf.MethodByName(name); !ok {
+			t.Fatalf("Authenticator missing %s", name)
+		}
+	}
+}
+
+func TestAuthenticationContextAccessors(t *testing.T) {
+	ctx := withAuthentication(context.Background(), Authentication{Subject: "user:123"})
+	got, ok := AuthenticationFrom(ctx)
+	if !ok || got.Subject != "user:123" {
+		t.Fatalf("AuthenticationFrom = (%+v, %v), want user:123", got, ok)
+	}
+	subject, ok := SubjectFrom(ctx)
+	if !ok || subject != "user:123" {
+		t.Fatalf("SubjectFrom = (%q, %v), want user:123", subject, ok)
+	}
+	if _, ok := AuthenticationFrom(context.Background()); ok {
+		t.Fatal("AuthenticationFrom bare context returned ok=true")
+	}
+}
+
+func TestAuthenticationPublicWriterAbsent(t *testing.T) {
+	body, err := os.ReadFile("context.go")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatal(err)
 	}
-	if resp != "ok" {
-		t.Errorf("resp = %v, want ok", resp)
-	}
-	if auth.called != 0 {
-		t.Errorf("authenticator called %d times, want 0", auth.called)
+	if strings.Contains(string(body), "func WithAuthentication(") {
+		t.Fatal("public WithAuthentication must not exist")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Server: REQUIRED schemes path installs allowed set into ctx
-// ---------------------------------------------------------------------------
-
-func TestServer_RequiredSchemes_InstallsAllowedSet(t *testing.T) {
-	var capturedCtx context.Context
-	auth := &fakeAuthenticator{
-		captureCtx: &capturedCtx,
+func TestServerConstructionValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func()
+		want string
+	}{
+		{name: "empty", fn: func() { Server(nil) }, want: "authenticator collection is empty"},
+		{name: "nil", fn: func() { Server([]Authenticator{nil}) }, want: "authenticator[0] is nil"},
+		{name: "typed nil", fn: func() { var a *fakeAuthenticator; Server([]Authenticator{a}) }, want: "authenticator[0] is nil"},
+		{name: "empty scheme", fn: func() { Server([]Authenticator{&fakeAuthenticator{}}) }, want: "authenticator[0] has empty scheme"},
+		{name: "duplicate scheme", fn: func() {
+			Server([]Authenticator{
+				&fakeAuthenticator{scheme: "jwt"},
+				&fakeAuthenticator{scheme: "jwt"},
+			})
+		}, want: `duplicate scheme "jwt" at authenticator[1]`},
+		{name: "nil option", fn: func() { Server([]Authenticator{&fakeAuthenticator{scheme: "jwt"}}, nil) }, want: "option[0] is nil"},
+		{name: "unknown rule scheme", fn: func() {
+			Server(
+				[]Authenticator{&fakeAuthenticator{scheme: "jwt"}},
+				WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
+					"/svc/Op": {Mode: authnpb.AuthnRule_MODE_REQUIRED, Schemes: []string{"mtls"}},
+				})),
+			)
+		}, want: `operation "/svc/Op" references unknown scheme "mtls"`},
+		{name: "unknown public rule scheme", fn: func() {
+			Server(
+				[]Authenticator{&fakeAuthenticator{scheme: "jwt"}},
+				WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
+					"/svc/Public": {Mode: authnpb.AuthnRule_MODE_PUBLIC, Schemes: []string{"mtls"}},
+				})),
+			)
+		}, want: `operation "/svc/Public" references unknown scheme "mtls"`},
 	}
 
-	rules := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			message := panicMessage(t, tt.fn)
+			if !strings.Contains(message, tt.want) {
+				t.Fatalf("panic = %q, want %q", message, tt.want)
+			}
+			if strings.Contains(message, "Bearer") || strings.Contains(message, "token-secret") {
+				t.Fatalf("panic leaked credential: %q", message)
+			}
+		})
+	}
+}
+
+func TestServerSnapshotsSchemesAndAuthenticatorSlice(t *testing.T) {
+	first := &fakeAuthenticator{scheme: "jwt", auth: Authentication{Subject: "user:first"}}
+	second := &fakeAuthenticator{scheme: "api_key", auth: Authentication{Subject: "user:second"}}
+	authenticators := []Authenticator{first, second}
+	mw := Server(authenticators)
+	authenticators[0] = second
+
+	for range 2 {
+		ctx, err := invoke(t, mw, authnContext("/svc/Op"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		subject, _ := SubjectFrom(ctx)
+		if subject != "user:first" {
+			t.Fatalf("subject = %q, want user:first", subject)
+		}
+	}
+	if first.schemeCalls != 1 || second.schemeCalls != 1 {
+		t.Fatalf("Scheme calls = (%d, %d), want (1, 1)", first.schemeCalls, second.schemeCalls)
+	}
+}
+
+func TestServerPublicRuleSkipsAuthenticators(t *testing.T) {
+	a := &fakeAuthenticator{scheme: "jwt", err: stderrors.New("must not run")}
+	mw := Server(
+		[]Authenticator{a},
+		WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
+			"/svc/Public": {Mode: authnpb.AuthnRule_MODE_PUBLIC},
+		})),
+	)
+	if _, err := invoke(t, mw, authnContext("/svc/Public")); err != nil {
+		t.Fatal(err)
+	}
+	if a.calls != 0 {
+		t.Fatalf("calls = %d, want 0", a.calls)
+	}
+}
+
+func TestServerRuleFilterPreservesInjectionOrder(t *testing.T) {
+	first := &fakeAuthenticator{scheme: "jwt", auth: Authentication{Subject: "user:first"}}
+	second := &fakeAuthenticator{scheme: "api_key", auth: Authentication{Subject: "user:second"}}
+	mw := Server(
+		[]Authenticator{first, second},
+		WithRulesFuncs(rules(map[string]*authnpb.AuthnRule{
 			"/svc/Op": {
 				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"jwt", "apikey"},
+				Schemes: []string{"api_key", "jwt"},
 			},
-		}
-	}
-
-	mw := Server(auth, WithRulesFuncs(rules))
-	handler := mw(func(_ context.Context, _ any) (any, error) { return nil, nil })
-
-	if _, err := handler(transportCtx("/svc/Op"), nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if auth.called != 1 {
-		t.Fatalf("authenticator called %d times, want 1", auth.called)
-	}
-
-	allowed := allowedSchemesFrom(capturedCtx)
-	if allowed == nil {
-		t.Fatal("allowedSchemes ctx channel should be installed")
-	}
-	if _, ok := allowed["jwt"]; !ok {
-		t.Error("allowed should contain jwt")
-	}
-	if _, ok := allowed["apikey"]; !ok {
-		t.Error("allowed should contain apikey")
-	}
-	if _, ok := allowed["mtls"]; ok {
-		t.Error("allowed should NOT contain mtls")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Server: unannotated path → allowed=nil (fail-open)
-// ---------------------------------------------------------------------------
-
-func TestServer_UnannotatedPath_AllowedNil(t *testing.T) {
-	var capturedCtx context.Context
-	auth := &fakeAuthenticator{
-		captureCtx: &capturedCtx,
-	}
-
-	rules := func() map[string]*authnpb.AuthnRule {
-		// No rule entry for this op.
-		return map[string]*authnpb.AuthnRule{
-			"/svc/Other": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"jwt"},
-			},
-		}
-	}
-
-	mw := Server(auth, WithRulesFuncs(rules))
-	handler := mw(func(_ context.Context, _ any) (any, error) { return nil, nil })
-
-	if _, err := handler(transportCtx("/svc/Op"), nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if auth.called != 1 {
-		t.Errorf("authenticator called %d times, want 1", auth.called)
-	}
-	if allowed := allowedSchemesFrom(capturedCtx); allowed != nil {
-		t.Errorf("allowed = %v, want nil (fail-open)", allowed)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Server: success → enriched ctx passed to handler
-// ---------------------------------------------------------------------------
-
-func TestServer_Success_UsesEnrichedCtx(t *testing.T) {
-	// The engine returns a ctx enriched with an auth type.
-	enriched := WithAuthType(context.Background(), "jwt")
-	inner := &fakeAuthenticator{returnCtx: enriched}
-	auth := Multi(Named("jwt", inner))
-
-	mw := Server(auth)
-
-	var handlerCtx context.Context
-	handler := mw(func(ctx context.Context, _ any) (any, error) {
-		handlerCtx = ctx
-		return nil, nil
-	})
-
-	if _, err := handler(transportCtx("/svc/Op"), nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// The handler should receive the enriched ctx from the engine.
-	authType, ok := AuthTypeFrom(handlerCtx)
-	if !ok {
-		t.Fatal("expected AuthType in handler ctx (enriched from engine)")
-	}
-	if authType != "jwt" {
-		t.Errorf("AuthType = %q, want jwt", authType)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Server: single-engine failure → default Unauthorized
-// ---------------------------------------------------------------------------
-
-func TestServer_SingleFailure_ReturnsUnauthorized(t *testing.T) {
-	sentinel := errors.New("token expired")
-	auth := &fakeAuthenticator{returnErr: sentinel}
-
-	mw := Server(auth)
-	handler := mw(func(_ context.Context, _ any) (any, error) {
-		t.Fatal("handler must not run on auth failure")
-		return nil, nil
-	})
-
-	_, err := handler(transportCtx("/svc/Op"), nil)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !strings.Contains(err.Error(), "AUTHN_FAILED") {
-		t.Errorf("err = %q, expected to contain AUTHN_FAILED", err.Error())
-	}
-	if !strings.Contains(err.Error(), "token expired") {
-		t.Errorf("err = %q, expected to contain underlying reason", err.Error())
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Server: Multi failure (SchemeAttemptsErr) → aggregated reason
-// ---------------------------------------------------------------------------
-
-func TestServer_MultiFailure_AggregatesReason(t *testing.T) {
-	jwtAuth := &fakeAuthenticator{returnErr: ErrNoCredentials}
-	apikeyAuth := &fakeAuthenticator{returnErr: ErrNoCredentials}
-
-	auth := Multi(
-		Named("jwt", jwtAuth),
-		Named("apikey", apikeyAuth),
+		})),
 	)
-
-	rules := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
-			"/svc/Op": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"jwt", "apikey"},
-			},
-		}
+	ctx, err := invoke(t, mw, authnContext("/svc/Op"))
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	mw := Server(auth,
-		WithRulesFuncs(rules),
-		WithErrorHandler(func(_ context.Context, err error) error {
-			return err
-		}),
-	)
-
-	handler := mw(func(_ context.Context, _ any) (any, error) {
-		t.Fatal("handler must not run on auth failure")
-		return nil, nil
-	})
-
-	_, err := handler(transportCtx("/svc/Op"), nil)
-	if err == nil {
-		t.Fatal("expected error from Multi failure")
-	}
-	if _, ok := err.(SchemeAttemptsErr); !ok {
-		t.Errorf("err type = %T, want SchemeAttemptsErr", err)
-	}
-	errStr := err.Error()
-	if !strings.Contains(errStr, "jwt: authn: no credentials") {
-		t.Errorf("err = %q, missing jwt attempt", errStr)
-	}
-	if !strings.Contains(errStr, "apikey: authn: no credentials") {
-		t.Errorf("err = %q, missing apikey attempt", errStr)
-	}
-	if !errors.Is(err, ErrNoCredentials) {
-		t.Errorf("err = %v, want ErrNoCredentials", err)
+	subject, _ := SubjectFrom(ctx)
+	if subject != "user:first" || second.calls != 0 {
+		t.Fatalf("subject = %q, second calls = %d", subject, second.calls)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Server: WithErrorHandler overrides default response
-// ---------------------------------------------------------------------------
-
-func TestServer_WithErrorHandler_OverridesDefault(t *testing.T) {
-	sentinel := errors.New("upstream failed")
-	custom := errors.New("custom converted")
-
-	auth := &fakeAuthenticator{returnErr: sentinel}
-	mw := Server(auth, WithErrorHandler(func(_ context.Context, _ error) error {
-		return custom
-	}))
-
-	handler := mw(func(_ context.Context, _ any) (any, error) {
-		t.Fatal("handler must not run on auth failure")
-		return nil, nil
-	})
-
-	_, err := handler(transportCtx("/svc/Op"), nil)
-	if !errors.Is(err, custom) {
-		t.Errorf("err = %v, want %v", err, custom)
+func TestServerContinuesOnlyForNoCredentials(t *testing.T) {
+	first := &fakeAuthenticator{scheme: "jwt", err: fmt.Errorf("jwt missing: %w", ErrNoCredentials)}
+	second := &fakeAuthenticator{scheme: "api_key", auth: Authentication{Subject: "service:worker"}}
+	mw := Server([]Authenticator{first, second})
+	ctx, err := invoke(t, mw, authnContext("/svc/Op"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject, _ := SubjectFrom(ctx)
+	if subject != "service:worker" || first.calls != 1 || second.calls != 1 {
+		t.Fatalf("subject=%q calls=(%d,%d)", subject, first.calls, second.calls)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Server: default error response (no WithErrorHandler) is Unauthorized
-// ---------------------------------------------------------------------------
-
-func TestServer_DefaultErrorIsUnauthorized(t *testing.T) {
-	sentinel := errors.New("boom")
-	auth := &fakeAuthenticator{returnErr: sentinel}
-	mw := Server(auth)
-
-	handler := mw(func(_ context.Context, _ any) (any, error) {
-		t.Fatal("handler must not run on auth failure")
-		return nil, nil
-	})
-
-	_, err := handler(transportCtx("/svc/Op"), nil)
-	if err == nil {
-		t.Fatal("expected error")
+func TestServerRejectedCredentialsFailFast(t *testing.T) {
+	first := &fakeAuthenticator{scheme: "jwt", err: fmt.Errorf("invalid jwt: %w", ErrCredentialsRejected)}
+	second := &fakeAuthenticator{scheme: "api_key", auth: Authentication{Subject: "service:worker"}}
+	_, err := invoke(t, Server([]Authenticator{first, second}), authnContext("/svc/Op"))
+	if !authnpb.IsAuthnErrorReasonUnauthenticated(err) {
+		t.Fatalf("error = %v, want UNAUTHENTICATED", err)
 	}
-	if !strings.Contains(err.Error(), "AUTHN_FAILED") {
-		t.Errorf("err = %q, expected to contain AUTHN_FAILED", err.Error())
-	}
-	if !strings.Contains(err.Error(), "boom") {
-		t.Errorf("err = %q, expected to contain underlying reason 'boom'", err.Error())
+	if second.calls != 0 {
+		t.Fatalf("second calls = %d, want 0", second.calls)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Server: WithAuditor emits CloudEvent
-// ---------------------------------------------------------------------------
+func TestServerErrorMappingAndCause(t *testing.T) {
+	providerCause := stderrors.New("provider token-secret detail")
+	tests := []struct {
+		name    string
+		auth    Authentication
+		err     error
+		matcher func(error) bool
+		code    int32
+		message string
+	}{
+		{name: "no credentials", err: fmt.Errorf("missing: %w", ErrNoCredentials), matcher: authnpb.IsAuthnErrorReasonUnauthenticated, code: 401, message: "authentication failed"},
+		{name: "rejected", err: fmt.Errorf("rejected: %w: %w", ErrCredentialsRejected, providerCause), matcher: authnpb.IsAuthnErrorReasonUnauthenticated, code: 401, message: "authentication failed"},
+		{name: "unavailable", err: fmt.Errorf("jwks: %w: %w", ErrUnavailable, providerCause), matcher: authnpb.IsAuthnErrorReasonUnavailable, code: 503, message: "authentication service unavailable"},
+		{name: "internal", err: providerCause, matcher: authnpb.IsAuthnErrorReasonInternal, code: 500, message: "internal authentication error"},
+		{name: "invalid result", auth: Authentication{}, matcher: authnpb.IsAuthnErrorReasonInternal, code: 500, message: "internal authentication error"},
+	}
 
-func TestServer_WithAuditor_Emits(t *testing.T) {
-	sentinel := errors.New("bad token")
-	auth := &fakeAuthenticator{returnErr: sentinel}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &fakeAuthenticator{scheme: "jwt", auth: tt.auth, err: tt.err}
+			_, err := invoke(t, Server([]Authenticator{a}), authnContext("/svc/Op"))
+			if !tt.matcher(err) {
+				t.Fatalf("error = %v, wrong generated reason", err)
+			}
+			ke := kerrors.FromError(err)
+			if ke.Code != tt.code || ke.Message != tt.message {
+				t.Fatalf("status = (%d, %q), want (%d, %q)", ke.Code, ke.Message, tt.code, tt.message)
+			}
+			wire, marshalErr := json.Marshal(ke.GRPCStatus().Proto())
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			if bytes.Contains(wire, []byte("token-secret")) {
+				t.Fatalf("wire status leaked cause: %s", wire)
+			}
+			httpWire, marshalErr := json.Marshal(ke)
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			if bytes.Contains(httpWire, []byte("token-secret")) {
+				t.Fatalf("HTTP error leaked cause: %s", httpWire)
+			}
+			if strings.Contains(err.Error(), "token-secret") {
+				t.Fatalf("error string leaked cause: %v", err)
+			}
+			if tt.err != nil && !stderrors.Is(err, tt.err) {
+				t.Fatalf("error chain does not preserve %v", tt.err)
+			}
+		})
+	}
+}
+
+func TestServerAuditUsesTypedSafePayloads(t *testing.T) {
 	auditor := &fakeAuditor{}
-
-	mw := Server(auth, WithAuditor(auditor))
-	handler := mw(func(_ context.Context, _ any) (any, error) {
-		t.Fatal("handler must not run on auth failure")
-		return nil, nil
-	})
-
-	_, _ = handler(transportCtx("/svc/SecureOp"), nil)
-
-	if len(auditor.events) != 1 {
-		t.Fatalf("auditor.events count = %d, want 1", len(auditor.events))
-	}
-	evt := auditor.events[0]
-	if evt.Type() != EventTypeAuthnFailure {
-		t.Errorf("event type = %q, want %s", evt.Type(), EventTypeAuthnFailure)
-	}
-	// Source is set from app context ("//unknown" when no app is registered).
-	if evt.Source() == "" {
-		t.Errorf("event source should not be empty")
-	}
-	// Data is protobuf-encoded: the reason string should appear in the raw bytes.
-	if data := string(evt.Data()); !strings.Contains(data, "bad token") {
-		t.Errorf("event data = %q, want to contain 'bad token'", data)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Server: WithAuditor NOT configured → silent
-// ---------------------------------------------------------------------------
-
-func TestServer_WithoutAuditor_Silent(t *testing.T) {
-	auth := &fakeAuthenticator{returnErr: errors.New("fail")}
-
-	// No auditor configured — should not panic or emit.
-	mw := Server(auth)
-	handler := mw(func(_ context.Context, _ any) (any, error) {
-		t.Fatal("handler must not run on auth failure")
-		return nil, nil
-	})
-
-	_, err := handler(transportCtx("/svc/Op"), nil)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	// No assertion on auditor — just ensure no panic.
-}
-
-// ---------------------------------------------------------------------------
-// WithRulesFuncs merge behavior (variadic + nil + overwrite)
-// ---------------------------------------------------------------------------
-
-func TestWithRulesFuncs_MergeBehavior(t *testing.T) {
-	fn1 := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
-			"/a/Healthz": {Mode: authnpb.AuthnRule_MODE_PUBLIC},
-			"/a/Op": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"jwt"},
-			},
-		}
-	}
-	fn2 := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
-			"/b/Healthz": {Mode: authnpb.AuthnRule_MODE_PUBLIC},
-			"/b/Op": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"apikey"},
-			},
-		}
-	}
-
-	cfg := &serverConfig{}
-	WithRulesFuncs(fn1, nil, fn2)(cfg)
-
-	if len(cfg.rules) != 4 {
-		t.Errorf("rules len = %d, want 4", len(cfg.rules))
-	}
-	if cfg.rules["/a/Healthz"].GetMode() != authnpb.AuthnRule_MODE_PUBLIC {
-		t.Errorf("/a/Healthz mode = %v, want MODE_PUBLIC", cfg.rules["/a/Healthz"].GetMode())
-	}
-	if cfg.rules["/b/Healthz"].GetMode() != authnpb.AuthnRule_MODE_PUBLIC {
-		t.Errorf("/b/Healthz mode = %v, want MODE_PUBLIC", cfg.rules["/b/Healthz"].GetMode())
-	}
-	if got := cfg.rules["/a/Op"].GetSchemes(); len(got) != 1 || got[0] != "jwt" {
-		t.Errorf("/a/Op schemes = %v, want [jwt]", got)
-	}
-	if got := cfg.rules["/b/Op"].GetSchemes(); len(got) != 1 || got[0] != "apikey" {
-		t.Errorf("/b/Op schemes = %v, want [apikey]", got)
-	}
-}
-
-func TestWithRulesFuncs_LaterOverwritesEarlier(t *testing.T) {
-	fn1 := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
-			"/svc/Op": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"jwt"},
-			},
-		}
-	}
-	fn2 := func() map[string]*authnpb.AuthnRule {
-		return map[string]*authnpb.AuthnRule{
-			"/svc/Op": {
-				Mode:    authnpb.AuthnRule_MODE_REQUIRED,
-				Schemes: []string{"apikey"},
-			},
-		}
-	}
-
-	cfg := &serverConfig{}
-	WithRulesFuncs(fn1, fn2)(cfg)
-
-	got := cfg.rules["/svc/Op"].GetSchemes()
-	if len(got) != 1 || got[0] != "apikey" {
-		t.Errorf("/svc/Op schemes = %v, want [apikey] (later wins)", got)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Multi: first-success-wins; subsequent engines NOT called
-// ---------------------------------------------------------------------------
-
-func TestMulti_FirstSuccessWins(t *testing.T) {
-	enriched := WithAuthType(context.Background(), "jwt")
-	first := &fakeAuthenticator{returnCtx: enriched}
-	second := &fakeAuthenticator{returnErr: errors.New("must not be called")}
-
-	auth := Multi(
-		Named("jwt", first),
-		Named("apikey", second),
-	)
-
-	ctx := withAllowedSchemes(context.Background(), nil)
-	resultCtx, err := auth.Authenticate(ctx)
+	success := &fakeAuthenticator{scheme: "jwt", auth: Authentication{Subject: "user:123"}}
+	ctx, err := invoke(t, Server([]Authenticator{success}, WithAuditor(auditor)), authnContext("/svc/Op"))
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatal(err)
 	}
-	// Verify the enriched ctx is returned.
-	if at, ok := AuthTypeFrom(resultCtx); !ok || at != "jwt" {
-		t.Errorf("AuthType from result = (%q, %v), want (jwt, true)", at, ok)
+	if subject, _ := SubjectFrom(ctx); subject != "user:123" {
+		t.Fatalf("subject = %q", subject)
 	}
-	if first.called != 1 {
-		t.Errorf("first.called = %d, want 1", first.called)
+	if len(auditor.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(auditor.events))
 	}
-	if second.called != 0 {
-		t.Errorf("second.called = %d, want 0 (first-success short-circuit)", second.called)
+	var successData authnauditpb.AuthnSuccess
+	if err := proto.Unmarshal(auditor.events[0].Data(), &successData); err != nil {
+		t.Fatal(err)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Multi: allowed filter skips non-matching engines
-// ---------------------------------------------------------------------------
-
-func TestMulti_AllowedFilter_SkipsNonMatching(t *testing.T) {
-	jwtAuth := &fakeAuthenticator{}
-	apikeyAuth := &fakeAuthenticator{returnErr: errors.New("must not be called")}
-
-	auth := Multi(
-		Named("jwt", jwtAuth),
-		Named("apikey", apikeyAuth),
-	)
-
-	allowed := map[string]struct{}{"jwt": {}}
-	ctx := withAllowedSchemes(context.Background(), allowed)
-
-	if _, err := auth.Authenticate(ctx); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if successData.Scheme != "jwt" || successData.Subject != "user:123" {
+		t.Fatalf("success scheme = %q, subject = %q", successData.GetScheme(), successData.GetSubject())
 	}
-	if jwtAuth.called != 1 {
-		t.Errorf("jwtAuth.called = %d, want 1", jwtAuth.called)
+	if auditor.events[0].Subject() != "" {
+		t.Fatalf("CloudEvents subject = %q, want empty", auditor.events[0].Subject())
 	}
-	if apikeyAuth.called != 0 {
-		t.Errorf("apikeyAuth.called = %d, want 0 (filtered out)", apikeyAuth.called)
+	if _, ok := auditor.events[0].Extensions()["authid"]; ok {
+		t.Fatal("authid extension must not exist")
 	}
-}
 
-// ---------------------------------------------------------------------------
-// Multi: empty intersection → errSchemesEmpty
-// ---------------------------------------------------------------------------
-
-func TestMulti_EmptyIntersection_ReturnsErrSchemesEmpty(t *testing.T) {
-	jwtAuth := &fakeAuthenticator{returnErr: errors.New("must not be called")}
-
-	auth := Multi(Named("jwt", jwtAuth))
-
-	allowed := map[string]struct{}{"mtls": {}}
-	ctx := withAllowedSchemes(context.Background(), allowed)
-
-	_, err := auth.Authenticate(ctx)
-	if !errors.Is(err, errSchemesEmpty) {
-		t.Errorf("err = %v, want errSchemesEmpty", err)
+	auditor.events = nil
+	failure := &fakeAuthenticator{scheme: "api_key", err: fmt.Errorf("token-secret: %w", ErrCredentialsRejected)}
+	_, _ = invoke(t, Server([]Authenticator{failure}, WithAuditor(auditor)), authnContext("/svc/Op"))
+	if len(auditor.events) != 1 {
+		t.Fatalf("failure events = %d, want 1", len(auditor.events))
 	}
-	if jwtAuth.called != 0 {
-		t.Errorf("jwtAuth.called = %d, want 0 (filtered out)", jwtAuth.called)
+	var failureData authnauditpb.AuthnFailure
+	if err := proto.Unmarshal(auditor.events[0].Data(), &failureData); err != nil {
+		t.Fatal(err)
+	}
+	if failureData.Reason != authnauditpb.AuthnFailureReason_AUTHN_FAILURE_REASON_REJECTED || failureData.Code != 401 {
+		t.Fatalf("failure reason = %s, code = %d", failureData.GetReason(), failureData.GetCode())
+	}
+	if len(failureData.Attempts) != 1 || failureData.Attempts[0].Scheme != "api_key" {
+		t.Fatalf("attempts = %+v", failureData.Attempts)
+	}
+	if bytes.Contains(auditor.events[0].Data(), []byte("token-secret")) {
+		t.Fatal("failure audit leaked backend error")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Multi: all no credentials aggregate into SchemeAttemptsErr and ErrNoCredentials
-// ---------------------------------------------------------------------------
-
-func TestMulti_AllNoCredentials_AggregatesIntoSchemeAttemptsErr(t *testing.T) {
-	jwtAuth := &fakeAuthenticator{returnErr: ErrNoCredentials}
-	apikeyAuth := &fakeAuthenticator{returnErr: fmt.Errorf("apikey: %w", ErrNoCredentials)}
-
-	auth := Multi(
-		Named("jwt", jwtAuth),
-		Named("apikey", apikeyAuth),
-	)
-
-	ctx := withAllowedSchemes(context.Background(), nil)
-	_, err := auth.Authenticate(ctx)
-	if err == nil {
-		t.Fatal("expected aggregated error")
+func TestServerAuditFailureIsBestEffort(t *testing.T) {
+	auditor := &fakeAuditor{err: stderrors.New("audit unavailable")}
+	a := &fakeAuthenticator{scheme: "jwt", auth: Authentication{Subject: "user:123"}}
+	ctx, err := invoke(t, Server([]Authenticator{a}, WithAuditor(auditor)), authnContext("/svc/Op"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !errors.Is(err, ErrNoCredentials) {
-		t.Fatalf("err = %v, want ErrNoCredentials", err)
-	}
-
-	as, ok := err.(SchemeAttemptsErr)
-	if !ok {
-		t.Fatalf("err type = %T, want SchemeAttemptsErr", err)
-	}
-	attempts := as.SchemeAttempts()
-	if len(attempts) != 2 {
-		t.Fatalf("attempts len = %d, want 2", len(attempts))
-	}
-	if attempts[0].Scheme != "jwt" || attempts[0].Reason != "authn: no credentials" {
-		t.Errorf("attempts[0] = %+v, want {jwt, authn: no credentials}", attempts[0])
-	}
-	if attempts[1].Scheme != "apikey" || attempts[1].Reason != "apikey: authn: no credentials" {
-		t.Errorf("attempts[1] = %+v, want {apikey, apikey: authn: no credentials}", attempts[1])
+	if subject, _ := SubjectFrom(ctx); subject != "user:123" {
+		t.Fatalf("subject = %q", subject)
 	}
 }
 
-func TestMulti_InvalidCredentialFailsFast(t *testing.T) {
-	jwtAuth := &fakeAuthenticator{returnErr: errors.New("jwt verify failed")}
-	apikeyAuth := &fakeAuthenticator{}
+func TestServerLoggerIsOptionalAndNotInjected(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	a := &fakeAuthenticator{scheme: "jwt", err: fmt.Errorf("token-secret: %w", ErrCredentialsRejected)}
 
-	auth := Multi(
-		Named("jwt", jwtAuth),
-		Named("apikey", apikeyAuth),
-	)
-
-	_, err := auth.Authenticate(withAllowedSchemes(context.Background(), nil))
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if errors.Is(err, ErrNoCredentials) {
-		t.Fatalf("err = %v, must not match ErrNoCredentials", err)
-	}
-	if apikeyAuth.called != 0 {
-		t.Fatalf("apikeyAuth.called = %d, want 0", apikeyAuth.called)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// SchemeAttemptsErr interface assertion works on *schemeAttemptsErr
-// ---------------------------------------------------------------------------
-
-func TestSchemeAttemptsErr_InterfaceAssertion(t *testing.T) {
-	pkgPrivate := &schemeAttemptsErr{
-		attempts: []SchemeAttempt{
-			{Scheme: "jwt", Reason: "boom"},
-		},
+	_, _ = invoke(t, Server([]Authenticator{a}), authnContext("/svc/Op"))
+	if logs.Len() != 0 {
+		t.Fatalf("logs without WithLogger = %q", logs.String())
 	}
 
-	var asInterface SchemeAttemptsErr = pkgPrivate
-	if got := asInterface.SchemeAttempts(); len(got) != 1 || got[0].Scheme != "jwt" {
-		t.Errorf("SchemeAttempts() = %v, want [{jwt boom}]", got)
+	_, _ = invoke(t, Server([]Authenticator{a}, WithLogger(logger)), authnContext("/svc/Op"))
+	if !strings.Contains(logs.String(), "authentication failed") || !strings.Contains(logs.String(), "REJECTED") {
+		t.Fatalf("logs = %q, want stable failure fields", logs.String())
 	}
-	// Also satisfies error interface.
-	var asErr error = pkgPrivate
-	if asErr.Error() == "" {
-		t.Error("Error() returned empty string")
+	if strings.Contains(logs.String(), "token-secret") {
+		t.Fatalf("logs leaked cause: %q", logs.String())
+	}
+
+	logs.Reset()
+	success := &fakeAuthenticator{scheme: "jwt", auth: Authentication{Subject: "identity-token-secret"}}
+	if _, err := invoke(t, Server([]Authenticator{success}, WithLogger(logger)), authnContext("/svc/Op")); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(logs.String(), "identity-token-secret") {
+		t.Fatalf("success log leaked subject: %q", logs.String())
+	}
+	if a.loggerSets != 0 {
+		t.Fatalf("SetLogger calls = %d, want 0", a.loggerSets)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Multi: iteration order follows injection order, NOT allowed order
-// ---------------------------------------------------------------------------
-
-func TestMulti_IterationFollowsInjectionOrderNotAllowedOrder(t *testing.T) {
-	var callOrder []string
-	jwtAuth := &fakeAuthenticator{returnErr: ErrNoCredentials}
-	apikeyAuth := &fakeAuthenticator{returnErr: ErrNoCredentials}
-
-	// Wrap each fake so we can observe call order.
-	tracedJWT := authenticatorFunc(func(ctx context.Context) (context.Context, error) {
-		callOrder = append(callOrder, "jwt")
-		return jwtAuth.Authenticate(ctx)
-	})
-	tracedAPIKey := authenticatorFunc(func(ctx context.Context) (context.Context, error) {
-		callOrder = append(callOrder, "apikey")
-		return apikeyAuth.Authenticate(ctx)
-	})
-
-	// Injection order: jwt first.
-	auth := Multi(
-		Named("jwt", tracedJWT),
-		Named("apikey", tracedAPIKey),
-	)
-
-	// Allowed map iteration is not ordered, but the injection order should
-	// be the observable iteration order.
-	allowed := map[string]struct{}{"apikey": {}, "jwt": {}}
-	ctx := withAllowedSchemes(context.Background(), allowed)
-
-	_, _ = auth.Authenticate(ctx)
-
-	if len(callOrder) != 2 {
-		t.Fatalf("callOrder len = %d, want 2", len(callOrder))
-	}
-	if callOrder[0] != "jwt" || callOrder[1] != "apikey" {
-		t.Errorf("callOrder = %v, want [jwt apikey] (injection order)", callOrder)
-	}
-}
-
-// authenticatorFunc adapts a func to the Authenticator interface for tests.
-type authenticatorFunc func(ctx context.Context) (context.Context, error)
-
-func (f authenticatorFunc) Authenticate(ctx context.Context) (context.Context, error) {
-	return f(ctx)
-}
-
-// ---------------------------------------------------------------------------
-// Compile-time guard: WithMethod has been removed
-// ---------------------------------------------------------------------------
-
-func TestWithMethod_Removed(t *testing.T) {
-	body := mustReadFile(t, "authn.go")
-	if strings.Contains(body, "func WithMethod(") {
-		t.Error("authn.go MUST NOT define WithMethod after Multi/Named refactor")
-	}
-}
-
-func TestNamed_ValidationPanics(t *testing.T) {
-	assertPanic(t, func() { Named("", &fakeAuthenticator{}) })
-	assertPanic(t, func() { Named("jwt", nil) })
-}
-
-func TestMulti_ValidationPanics(t *testing.T) {
-	assertPanic(t, func() { Multi() })
-	assertPanic(t, func() {
-		Multi(
-			Named("jwt", &fakeAuthenticator{}),
-			Named("jwt", &fakeAuthenticator{}),
-		)
-	})
-	assertPanic(t, func() {
-		Multi(NamedAuthenticator{scheme: "jwt"})
-	})
-	assertPanic(t, func() {
-		Multi(NamedAuthenticator{inner: &fakeAuthenticator{}})
-	})
-}
-
-func TestSuccessfulSchemeHolder_Removed(t *testing.T) {
-	body := mustReadFile(t, "context.go")
-	for _, needle := range []string{"successfulSchemeKey", "schemeHolder", "installSchemeHolder"} {
-		if strings.Contains(body, needle) {
-			t.Errorf("context.go MUST NOT contain %s", needle)
+func TestRemovedDispatcherFilesAreAbsent(t *testing.T) {
+	for _, path := range []string{"multi.go", "subject.go", "authtype_context.go"} {
+		if _, err := os.Stat(path); !stderrors.Is(err, os.ErrNotExist) {
+			t.Fatalf("%s still exists", path)
 		}
 	}
 }
 
-func assertPanic(t *testing.T, fn func()) {
+func panicMessage(t *testing.T, fn func()) (message string) {
 	t.Helper()
 	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic")
+		if recovered := recover(); recovered != nil {
+			message = fmt.Sprint(recovered)
 		}
 	}()
 	fn()
+	t.Fatal("expected panic")
+	return ""
 }
 
-func mustReadFile(t *testing.T, path string) string {
-	t.Helper()
-	b, err := readFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	return string(b)
-}
-
-// Ensure unused imports are not present (satisfy the Go compiler).
-var _ middleware.Middleware
+var _ audit.Auditor = (*fakeAuditor)(nil)
+var _ Authenticator = (*fakeAuthenticator)(nil)

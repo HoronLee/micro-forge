@@ -38,40 +38,31 @@ function encodeMultiSegmentPath(value: unknown): string {
     .join('/');
 }
 
-// AuthnFailure is the CloudEvents data payload for servora.authn.failure.v1
-// events. All string fields MUST be sanitised — no raw tokens, API keys, or
-// full JWT claims may appear here.
+// AuthnFailureReason is a stable, credential-free authentication outcome.
+export type AuthnFailureReason =
+  | 'AUTHN_FAILURE_REASON_INTERNAL'
+  | 'AUTHN_FAILURE_REASON_INVALID_RESULT'
+  | 'AUTHN_FAILURE_REASON_NO_CREDENTIALS'
+  | 'AUTHN_FAILURE_REASON_REJECTED'
+  | 'AUTHN_FAILURE_REASON_UNAVAILABLE'
+  | 'AUTHN_FAILURE_REASON_UNSPECIFIED';
+// AuthnFailure is the CloudEvents data payload for servora.authn.failure.v1.
 export type AuthnFailure = {
-  // attempts lists the per-scheme authentication results when Multi dispatch
-  // was used.
   attempts?: SchemeAttempt[];
-  // code is the HTTP/gRPC status code (e.g. 401).
   code?: number;
-  // message is a sanitised, human-readable failure description.
-  message?: string;
-  // reason is the high-level failure reason (e.g. "AUTHN_FAILED").
-  reason?: string;
+  reason?: AuthnFailureReason;
 };
 
-// SchemeAttempt records the outcome of a single authentication scheme within a
-// Multi-dispatcher round.
+// SchemeAttempt records one candidate scheme without backend error text.
 export type SchemeAttempt = {
-  // message is a sanitised description from this scheme's backend.
-  message?: string;
-  // reason is the sanitised failure reason returned by this scheme's backend.
-  reason?: string;
-  // scheme is the authenticator name (e.g. "jwt", "apikey", "casdoor").
+  reason?: AuthnFailureReason;
   scheme?: string;
 };
 
-// AuthnSuccess is the CloudEvents data payload for servora.authn.success.v1
-// events. Identity fields are intentionally omitted — the authenticated
-// subject is carried in CloudEvents extensions or set by the business layer.
+// AuthnSuccess is the CloudEvents data payload for servora.authn.success.v1.
 export type AuthnSuccess = {
-  // message is an optional human-readable note.
-  message?: string;
-  // scheme is the authentication scheme that succeeded (e.g. "jwt", "apikey").
   scheme?: string;
+  subject?: string;
 };
 
 

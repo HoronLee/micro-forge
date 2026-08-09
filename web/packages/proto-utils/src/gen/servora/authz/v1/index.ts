@@ -53,12 +53,23 @@ export type AuthzRule = {
   action?: string;
   // Authorization mode.
   mode?: AuthzMode;
-  // Proto field name in the request that carries the resource ID, e.g. "id".
-  // When empty, a static default resource ID is used (singleton/platform-level checks).
+  // Required proto field path in the request that carries the resource ID, e.g. "id".
+  // The path must resolve to a singular scalar field.
   resourceIdField?: string;
   // Resource type, e.g. "platform", "video", "server".
   resourceType?: string;
 };
 
+// AuthzErrorReason defines stable client-visible authorization failures.
+export type AuthzErrorReason =
+  // The authenticated subject is not permitted to perform the action.
+  | 'AUTHZ_ERROR_REASON_DENIED'
+  // The authorization contract or framework invariant was violated.
+  | 'AUTHZ_ERROR_REASON_INTERNAL'
+  // The request cannot produce a valid authorization target.
+  | 'AUTHZ_ERROR_REASON_INVALID_REQUEST'
+  // An authorization dependency is temporarily unavailable.
+  | 'AUTHZ_ERROR_REASON_UNAVAILABLE'
+  | 'AUTHZ_ERROR_REASON_UNSPECIFIED';
 
 // @@protoc_insertion_point(typescript-http-eof)
