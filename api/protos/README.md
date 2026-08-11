@@ -8,12 +8,11 @@ Proto files are organized in these top-level groups under `servora/`:
 
 | Group | Purpose | Members |
 |-------|---------|---------|
-| Annotations (flat) | Extension annotations consumed by `protoc-gen-servora-*` plugins. Each namespace holds a single `annotations.proto`. | `audit/v1` / `authn/v1` / `authz/v1` / `mapper/v1` / `conf/v1` |
+| Annotations (flat) | Extension annotations consumed by `protoc-gen-servora-*` plugins. Each namespace holds a single `annotations.proto`. | `audit/v1` / `conf/v1` |
 | `core/v1/` | Framework startup bootstrap model. | `bootstrap.proto` (Bootstrap / App / Server / Data / Registry / Source / Observability) |
-| `contrib/<域>/v1/` | Optional ecosystem sections consumed by contrib packages or business bootstrap code. | `db/redis` / `kafka` / `mail` / `db/clickhouse` / `openfga` |
-| `security/<域>/v1/` | Security primitives shared by runtime packages. | `tls` / `jwt` |
+| `contrib/<域>/v1/` | Optional ecosystem sections consumed by contrib packages or business bootstrap code. | `db/redis` / `kafka` / `mail` / `db/clickhouse` |
+| `security/<域>/v1/` | Security primitives shared by runtime packages. | `tls` |
 | `obs/<域>/v1/` | Observability runtime configuration consumed by obs packages. | `audit` |
-| Common schema | Shared API messages that are not framework bootstrap configuration. | `pagination/v1/` |
 | Neutral schema | CNCF / third-party envelope schemas that do not fit the categories above. | `cloudevents/v1/` |
 
 ## Modules
@@ -29,11 +28,7 @@ Proto files are organized in these top-level groups under `servora/`:
 | `servora.contrib.db.clickhouse.v1` | ClickHouse client configuration; section key `clickhouse` (optional), loaded explicitly with `bootstrap.Scan` and consumed by `contrib/db/clickhouse`. |
 | `servora.contrib.mail.v1` | SMTP and sender identity configuration provided as a proto-only convenience section. |
 | `servora.security.tls.v1` | Shared TLS configuration referenced by core server/client endpoint config and consumed by `security/tls`. |
-| `servora.security.jwt.v1` | JWT issuer / verifier configuration, including generated defaults for `access_expire=3600` and `refresh_expire=604800`. |
-| `servora.contrib.openfga.v1` | OpenFGA official SDK construction config; section key `openfga` (optional), generated required checks for `api_url` / `store_id`. |
 | `servora.audit.v1` | `servora/audit/v1/annotations.proto` 中的审计注解；供 `protoc-gen-servora-audit` 使用（extension `5010x`，支持 service-level `service_default` + 三态 `AuditMode`；`AuditRule` 只携带 RPC audit 开关）。 |
-| `servora.authz.v1` | `servora/authz/v1/annotations.proto` 中的授权注解；供 `protoc-gen-servora-authz` 使用（extension `5020x`，支持 service-level `service_default`）。 |
-| `servora.authn.v1` | `servora/authn/v1/annotations.proto` 中的认证注解；供 `protoc-gen-servora-authn` 使用（extension `5030x`，顶层 `AuthnMode` 使用 `AUTHN_MODE_*` 值，`AuthnRule` 支持 service-level `service_default` 与 `schemes`）。 |
 
 ## Loading configuration in business services
 

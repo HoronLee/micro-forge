@@ -1,6 +1,6 @@
 // Package audit provides engine-agnostic audit event emission using CloudEvents
-// as the envelope format. It defines the Auditor contract and ships MVP backends
-// (noop, stdout, log, kafka, multi) plus a Kratos middleware that intercepts RPC
+// as the envelope format. It defines the Auditor contract and ships backends
+// (noop, stdout, log, kafka, multi) plus Kratos middleware that intercepts RPC
 // calls and emits structured audit events.
 //
 // # Architecture
@@ -21,20 +21,18 @@
 //
 // # Middleware
 //
-// The Middleware function (audit_middleware.go) intercepts RPC calls, looks up
-// generated AuditRules by operation, builds servora.audit.rpc.v1 CloudEvents
-// events, and emits through the configured Auditor. Emission errors are logged
-// but never block business logic.
+// Middleware intercepts RPC calls, looks up generated AuditRules by operation,
+// builds servora.audit.rpc.v1 CloudEvents events, and emits through the configured
+// Auditor. Emission errors are logged and the handler result is preserved.
 //
 // Recommended middleware chain order:
 //
-//	recovery → tracing → logging → ratelimit → validate → metrics → audit.Middleware → authn → authz → handler
+//	recovery → tracing → logging → ratelimit → validate → metrics → audit.Middleware → additional middleware → handler
 //
 // # CloudEvents Attributes
 //
 // NewEvent sets CloudEvents required attributes and uses source="//app-name".
-// The generic RPC audit middleware sets subject to the transport operation and
-// adds errormessage for handler errors. AuthN/AuthZ identities live in their
-// typed payloads rather than authid. Other extensions are producer-owned, while
+// RPC audit middleware sets subject to the transport operation and adds
+// errormessage for handler errors. Other extensions are producer-owned, while
 // backend-only fields such as partitionkey stay private to their backend package.
 package audit

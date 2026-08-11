@@ -60,9 +60,9 @@ func TestResponseFilesAndOnlyGeneratedFile(t *testing.T) {
 func TestAssertGeneratedGoCompiles(t *testing.T) {
 	AssertGeneratedGoCompiles(t, `package fixture
 
-import authnpb "github.com/Servora-Kit/servora/api/gen/go/servora/authn/v1"
+import auditv1 "github.com/Servora-Kit/servora/api/gen/go/servora/audit/v1"
 
-var _ = authnpb.AuthnMode_AUTHN_MODE_PUBLIC
+var _ = auditv1.AuditMode_AUDIT_MODE_ENABLED
 `, "fixture")
 }
 

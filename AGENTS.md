@@ -7,7 +7,7 @@ Proto contract 驱动的 Go 微服务框架；包含运行时、protoc 插件、
 - `api/protos/`：公共 Proto 与 annotation
 - `api/gen/`：生成的独立 Go module
 - `cmd/`：CLI 与 `protoc-gen-servora-*`
-- `security/`：AuthN/AuthZ 等安全合同
+- `security/`：通用 TLS primitive
 - `obs/`：日志、追踪、指标、Audit
 - `contrib/`：可选第三方 Client 与 capability Adapter
 - `web/`：`@servora/proto-utils`

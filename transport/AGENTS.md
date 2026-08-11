@@ -20,21 +20,19 @@ transport/
 
 - `client/` 目录承载 `grpc/`、`http/`、`middleware/` 与 `endpoint/`（按 protocol 索引 service endpoint 配置）
 - `server/` 目录承载 `grpc/`、`http/`、`middleware/`、`endpoint/`（注册中心 endpoint URL 解析）、`accept/`（TCP accept 循环）
-- `server/middleware/whitelist.go` 的白名单语义是 **operation 白名单**，不是 IP 白名单
-- 本级目录表达的是 transport 共性能力，不直接承载认证/授权业务本身
+- `server/middleware/whitelist.go` 匹配 operation 白名单，而非 IP 白名单
 - TLS 配置构造（`BuildServerTLS` / `BuildClientTLS`）归 `security/tls`；transport 通过 alias `svrtls` 引用
 
 ## 边界约束
 
-- 本包负责传输层装配与协议辅助，不负责业务 handler、资源授权策略或领域规则
-- `security/authn` / `security/authz` 可基于 transport middleware 工作，但身份与权限语义不应反向塞入 transport 基础设施
-- 不在本级目录递归描述 `client/`、`server/` 子目录内部细节；需要更细规则时应在子目录独立维护
+- transport 包负责连接、协议和中间件装配；service 包负责 handler 与领域规则。
+- client/server 子目录分别维护各自的详细装配规则。
 
 ## 常见反模式
 
-- 在 transport 目录中写入业务 handler 或 service 级逻辑
-- 将 operation 白名单误解为网络访问控制白名单
-- 把 client / server 共性抽象与某个协议实现强耦合
+- 在 transport 目录中写入 service handler。
+- 将 operation 白名单当作网络访问控制白名单。
+- 把 client/server 共性抽象与单一协议实现强耦合。
 
 ## 测试与使用
 
@@ -46,5 +44,5 @@ go test ./transport/server/...
 
 ## 维护提示
 
-- 若新增 transport middleware，优先保证其可复用且与业务语义解耦
-- 若调整 client / server 目录边界，需同步检查父级 `servora/AGENTS.md` 与调用方引用说明
+- 新 middleware 遵循 transport 通用接口与现有装配方式。
+- 调整 client/server 目录时同步更新父级 `servora/AGENTS.md` 与调用方说明。

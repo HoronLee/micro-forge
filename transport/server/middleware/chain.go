@@ -34,15 +34,10 @@ import (
 //	    WithTrace(trace).
 //	    WithMetrics(mtc).
 //	    Build()
-//	ms = append(ms,
-//	    authn.Server(authenticators, authn.WithRulesFuncs(authnRules)),
-//	    authz.Server(authorizer, authz.WithRulesFuncs(authzRules)),
-//	)
+//	ms = append(ms, additionalMiddleware...)
 //
-// 注意：
-//   - HTTP 和 gRPC 共享同一个 ChainBuilder，通过传入不同的 Logger 区分
-//   - 返回的切片可以通过 builtin `append` 追加业务特定的中间件（如 authn / authz / selector）；ChainBuilder 不提供 fluent `Append` 方法
-//   - 如果需要完全自定义中间件顺序，请不要使用此 Builder，手动构建切片
+// HTTP 和 gRPC 共享 ChainBuilder，通过 logger 区分协议。Build 返回的切片
+// 可通过 append 追加中间件；完全自定义顺序时直接构建中间件切片。
 type ChainBuilder struct {
 	logger    *slog.Logger
 	trace     *corev1.Trace
@@ -102,7 +97,7 @@ func (b *ChainBuilder) WithoutRateLimit() *ChainBuilder {
 //  5. Validate  - Proto 参数校验
 //  6. Metrics   - 记录请求指标
 //
-// 返回的切片可以通过 append 追加业务特定的中间件（如 authn / authz）。
+// 返回切片可通过 append 追加中间件。
 func (b *ChainBuilder) Build() []middleware.Middleware {
 	var ms []middleware.Middleware
 

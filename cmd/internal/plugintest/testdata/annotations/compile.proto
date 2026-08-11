@@ -3,8 +3,6 @@ syntax = "proto3";
 package test.annotations.v1;
 
 import "servora/audit/v1/annotations.proto";
-import "servora/authn/v1/annotations.proto";
-import "servora/authz/v1/annotations.proto";
 
 message Request {
   string id = 1;
@@ -13,21 +11,9 @@ message Request {
 message Response {}
 
 service ContractService {
-  option (servora.authn.v1.service_default) = {
-    mode: AUTHN_MODE_REQUIRED
-    schemes: "jwt"
-  };
-  option (servora.authz.v1.service_default) = {
-    mode: AUTHZ_MODE_CHECK
-    action: "read"
-    resource_type: "fixture"
-    resource_id_field: "id"
-  };
   option (servora.audit.v1.service_default) = {mode: AUDIT_MODE_ENABLED};
 
   rpc Public(Request) returns (Response) {
-    option (servora.authn.v1.rule) = {mode: AUTHN_MODE_PUBLIC};
-    option (servora.authz.v1.rule) = {mode: AUTHZ_MODE_NONE};
     option (servora.audit.v1.rule) = {mode: AUDIT_MODE_DISABLED};
   }
 }

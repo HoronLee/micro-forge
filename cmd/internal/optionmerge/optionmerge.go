@@ -1,11 +1,6 @@
-// Package optionmerge provides shared merge logic for the three protoc-gen-servora-*
-// plugins (authn, authz, audit). All three follow identical semantics:
-//
-//   - method-level rule with mode != 0 (UNSPECIFIED) fully replaces the service default,
-//   - method-level rule absent or mode == 0 inherits the service default,
-//   - if neither contributes a non-zero mode, no rule applies.
-//
-// "Mode" is conventionally the first field (field number 1) in each rule proto message.
+// Package optionmerge provides merge logic for protoc-gen-servora-audit.
+// Method rules with a non-zero mode replace service defaults; absent or
+// unspecified method rules inherit the default. No effective mode means no rule.
 package optionmerge
 
 import (
@@ -13,8 +8,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// modeFieldNumber is the proto field number used for the mode enum across all
-// three rule types (AuthnRule.mode, AuthzRule.mode, AuditRule.mode).
+// modeFieldNumber is AuditRule.mode's protobuf field number.
 const modeFieldNumber protoreflect.FieldNumber = 1
 
 // Merge returns the effective rule after applying service-level / method-level

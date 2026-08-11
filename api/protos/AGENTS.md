@@ -7,7 +7,7 @@
 
 `api/protos/` 是 Servora 框架公共 proto contract 根，随仓库根 `buf.yaml` 发布到 `buf.build/servora/servora`。
 
-这里定义框架级 annotation、配置 schema、CloudEvents/audit schema 与少量通用数据结构；不存放业务服务 proto。
+这里定义框架级 annotation、配置 schema、CloudEvents/audit schema 与通用数据结构。
 
 ## 当前结构
 
@@ -17,8 +17,6 @@ api/protos/
 ├── AGENTS.md
 └── servora/
     ├── audit/v1/                    # audit annotation extensions
-    ├── authn/v1/                    # authn annotation extensions
-    ├── authz/v1/                    # authz annotation and runtime types
     ├── cloudevents/v1/              # CloudEvents envelope schema
     ├── conf/v1/                     # config annotation extensions
     ├── core/v1/                     # bootstrap config schema
@@ -27,7 +25,7 @@ api/protos/
     ├── contrib/{kafka,mail}/v1/     # optional section schema
     ├── contrib/db/{redis,clickhouse}/v1/ # database section schema
     ├── obs/audit/v1/                # audit runtime config schema
-    ├── security/{tls,jwt,authn,authz}/.../v1/ # security config/schema
+    ├── security/tls/v1/             # shared TLS configuration
     └── transport/http/cors/v1/      # transport config schema
 ```
 
@@ -44,9 +42,9 @@ import "servora/audit/v1/annotations.proto";
 - `go_package` 使用 `github.com/Servora-Kit/servora/api/gen/go/servora/<ns>/v1;<alias>`。
 - 新 annotation extension 号段遵守根 `AGENTS.md` 的 `5xx00` 规划。
 - `service_default` 合并语义必须与生成器测试一致：方法级显式字段覆盖服务级默认，未显式字段继承。
-- 第一方 backend/section 配置 proto 必须用 `servora.conf.v1.section` / `field` 表达 section、默认值和必填项；不要让 runtime 包重复维护默认值或 required 判断。
-- core `bootstrap.proto` 内的配置 message 不使用多余 `Config` 后缀；TLS、Redis 这类归属明确的配置放到所属域 proto，由 core 引用或业务显式 `bootstrap.Scan`。
-- 不新增 `extra/` proto 顶级目录；运行期配置按 owner 放入 `contrib` / `security` / `transport` / `obs`。
+- 第一方 backend/section 配置 proto 使用 `servora.conf.v1.section` / `field` 表达 section、默认值和必填项。
+- core `bootstrap.proto` 内的配置 message 采用所属域名称；TLS、Redis 等配置放在所属域 proto，由 core 引用或业务显式 `bootstrap.Scan`。
+- 运行期配置按 owner 归入 `contrib`、`security`、`transport` 或 `obs`。
 
 ## 生成与校验
 
@@ -67,3 +65,4 @@ just bsr-push
 - 在本目录新增 `buf.yaml` 与根 workspace 分叉。
 - import 使用相对 `../` 路径或 generated Go 路径。
 - 新增 proto 后忘记同步 `README.md` 中面向 BSR 的说明。
+

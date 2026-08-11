@@ -72,9 +72,7 @@ plugin: ## Install protoc-gen-* plugins (third-party + servora)
 	@go install github.com/google/gnostic/cmd/protoc-gen-openapi@$(PROTOC_GEN_OPENAPI_VERSION)
 	@go install github.com/envoyproxy/protoc-gen-validate@$(PROTOC_GEN_VALIDATE_VERSION)
 	@go install github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact@$(PROTOC_GEN_GO_REDACT_VERSION)
-	@go install ./cmd/protoc-gen-servora-authz
 	@go install ./cmd/protoc-gen-servora-audit
-	@go install ./cmd/protoc-gen-servora-authn
 	@go install ./cmd/protoc-gen-servora-conf
 	@go install ./cmd/protoc-gen-servora-crud
 	@echo "✓ Protoc plugins installed"

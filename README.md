@@ -104,7 +104,7 @@ func CallUser(ctx context.Context, l *slog.Logger, data *corev1.Data, d registry
 
 ### Proto 契约化⚖️
 
-配置文件、proto type<->go type映射、认证、授权、审计...在 Servora 的世界观下，这一切都可以从一个 proto 文件定义。Servora 提供了很多 protoc 插件来代码生成，以实现尽量以 proto 文件来规定除了普通接口请求以外的所有行为。
+配置文件、资源 API 与审计等框架行为都可以由 Proto contract 驱动。Servora 通过代码生成配合运行时能力，让普通请求之外的框架行为保持显式、版本化和可验证。
 
 以下是 Servora 提供的 Proto 插件，多数采用代码生成 + 运行时解析配合的方式工作。
 
@@ -143,106 +143,6 @@ if err := bootstrap.Scan(rt, redisCfg); err != nil {
 配置中心热更新属于 Kratos `Config.Watch` 的底层能力。业务如需在 watch 回调中复用上述契约，需要自行对新的 `Value` 执行 `Scan` 并调用 `ApplyConf()`；Servora 不会对远端配置变更自动重 scan、校验或回调。
 
 
-#### 认证
-
-通过 `service_default` 声明服务级默认认证策略，方法级 `rule` 可整段覆盖。`schemes` 接受 jwt / apikey / mtls / aksk 等任意字符串，支持业务自定义引擎。Plugin 生成 `AuthnRules` 表，由 `authn.Server` 中间件运行时分发。
-
-```proto
-import "servora/authn/v1/annotations.proto";
-
-service UserService {
-  option (servora.authn.v1.service_default) = {
-    mode: AUTHN_MODE_REQUIRED
-    schemes: ["jwt"]
-  };
-
-  // 继承 service_default：要求 jwt 通过
-  rpc GetProfile(GetProfileRequest) returns (User);
-
-  // 方法级覆盖：完全公开
-  rpc Login(LoginRequest) returns (LoginResponse) {
-    option (servora.authn.v1.rule) = { mode: AUTHN_MODE_PUBLIC };
-  }
-}
-```
-
-Plugin 生成 `AuthnRules()` 方法表。具体认证器由应用或 IAM 模块实现，并在服务装配时按优先级交给根 middleware：
-
-```go
-import (
-    "github.com/Servora-Kit/servora/security/authn"
-    pb "myapp/api/gen/go/myapp/user/v1"
-)
-
-mw := authn.Server(
-    []authn.Authenticator{oidcAuthenticator, apiKeyAuthenticator},
-    authn.WithRulesFuncs(pb.AuthnRules),
-)
-```
-
-认证器通过 `Scheme()` 固定声明方式，通过 `Authenticate` 返回 `Authentication{Subject}`。根 middleware 负责规则过滤、顺序分派和稳定的 401/503/500 错误映射；具体实现不把 token、API key 或完整 claims 写入认证结果。
-
-#### 授权
-
-跟认证同构：`service_default` 声明服务级默认授权策略，方法级 `rule` 可整段覆盖。授权检查由 `action` × `resource_type` × `resource_id_field`（从请求消息中提取资源 ID）三元组定义。默认接入 OpenFGA，可替换为任意实现 `Authorizer` 接口的后端。
-
-```proto
-import "servora/authz/v1/annotations.proto";
-
-service VideoService {
-  option (servora.authz.v1.service_default) = {
-    mode: AUTHZ_MODE_CHECK
-    action: "can_read"
-    resource_type: "video"
-    resource_id_field: "id"
-  };
-
-  // 继承 service_default：检查 can_read on video[req.id]
-  rpc GetVideo(GetVideoRequest) returns (Video);
-
-  // 方法级覆盖：换成 can_delete
-  rpc DeleteVideo(DeleteVideoRequest) returns (DeleteVideoResponse) {
-    option (servora.authz.v1.rule) = {
-      mode: AUTHZ_MODE_CHECK
-      action: "can_delete"
-      resource_type: "video"
-      resource_id_field: "id"
-    };
-  }
-
-  // 方法级覆盖：完全跳过授权
-  rpc ListPublicVideos(ListPublicVideosRequest) returns (ListPublicVideosResponse) {
-    option (servora.authz.v1.rule) = { mode: AUTHZ_MODE_NONE };
-  }
-}
-```
-
-Plugin 生成 `AuthzRules()` 规则表。业务侧先用 generated config 构造官方 OpenFGA SDK Client，再创建 capability-first AuthZ Adapter：
-
-```go
-import (
-    openfgaconfpb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/openfga/v1"
-    openfgaauthz "github.com/Servora-Kit/servora/contrib/authz/openfga"
-    openfgaclient "github.com/Servora-Kit/servora/contrib/openfga"
-    "github.com/Servora-Kit/servora/security/authz"
-    pb "myapp/api/gen/go/myapp/video/v1"
-)
-
-sdkClient, err := openfgaclient.NewClient(&openfgaconfpb.OpenFGA{
-    ApiUrl:  "http://openfga:8080",
-    StoreId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-})
-if err != nil {
-    return err
-}
-authorizer, err := openfgaauthz.New(sdkClient)
-if err != nil {
-    return err
-}
-mw := authz.Server(authorizer, authz.WithRulesFuncs(pb.AuthzRules))
-```
-
-未配置 `api_token` 时可连接受信内网 HTTP endpoint；一旦配置 `api_token`，`api_url` 必须使用 HTTPS，`NewClient` 会拒绝明文 HTTP，避免 Bearer credential 在传输层泄漏。
 
 #### CRUD 生态
 
@@ -252,7 +152,7 @@ Servora 提供了声明式、 AIP 风格约束的 CRUD 生态框架，用户只�
 
 #### 审计
 
-通过 `rule` 或 `service_default` 声明 RPC 是否进入通用审计。注解只表达开关；事件类型、业务目标、详情 data 和扩展属性由事件生产者负责，例如 authn/authz middleware、后续 CRUD generator 或业务显式 emit。通用 RPC 审计事件以 [CloudEvents](https://cloudevents.io/) 投递。
+通过 `rule` 或 `service_default` 声明 RPC 是否进入通用审计。注解只表达开关；事件类型、业务目标、详情 data 和扩展属性由事件生产者负责，例如产品服务、后续 CRUD generator 或业务显式 emit。通用 RPC 审计事件以 [CloudEvents](https://cloudevents.io/) 投递。
 
 ```proto
 import "servora/audit/v1/annotations.proto";

@@ -1,7 +1,7 @@
-// Command protoc-gen-servora-audit translates servora audit proto annotations
-// into a Go file (`audit_rules.gen.go`) consumed by the audit middleware at runtime.
+// Command protoc-gen-servora-audit translates Servora audit proto annotations
+// into a Go file (`audit_rules.gen.go`) consumed by audit middleware at runtime.
 //
-// Merge semantics (matches authn / authz):
+// Merge semantics:
 //   - method-level rule with mode != AUDIT_MODE_UNSPECIFIED replaces the
 //     service-level default in its entirety,
 //   - method-level rule absent (or mode == AUDIT_MODE_UNSPECIFIED) inherits
@@ -9,11 +9,10 @@
 //   - only methods whose merged mode is AUDIT_MODE_ENABLED reach the generated
 //     output; AUDIT_MODE_DISABLED and methods with no resolved rule are skipped.
 //
-// Cross-file template scanning: rules are gathered from ALL input files
-// (including non-generated dependencies). Templates are keyed by proto
-// fully-qualified service name so same-named services in different packages do
-// not share rules. Generated output groups by output directory so each
-// directory yields one audit_rules.gen.go covering the services declared in it.
+// Cross-file template scanning gathers rules from all input files, including
+// non-generated dependencies. Templates are keyed by proto fully-qualified
+// service name. Generated output is grouped by output directory, with one
+// audit_rules.gen.go covering the services declared in each directory.
 package main
 
 import (

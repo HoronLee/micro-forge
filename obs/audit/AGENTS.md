@@ -8,9 +8,9 @@ type Auditor interface {
 }
 ```
 
-`audit.Middleware` 在 handler 返回后按生成规则发送通用 RPC event。AuthN/AuthZ middleware 直接发送各自 typed event；每层只表达自己的结果。发送失败记录日志，不改变业务响应。
+`audit.Middleware` 根据生成规则在 handler 返回后发送通用 RPC event。发送失败写入日志，并返回原 handler 响应。
 
-`NewEvent` 设置 source，并从 sampled span 补 `traceparent`/`tracestate`。稳定领域字段放 typed data，少量平台路由信息才放 extension。不要恢复旧 runtime detail、`authid` 或公开 extension 常量。
+`NewEvent` 设置 source，并从 sampled span 添加 `traceparent` 和 `tracestate`。事件 data 保存领域字段，extension 保存路由字段。
 
 `multi.New` 负责 fanout 与 `Close`/`Flush` 传播。
 

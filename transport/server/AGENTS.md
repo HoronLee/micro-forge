@@ -7,8 +7,6 @@
 
 `transport/server` 提供服务端 transport 装配：统一 `Server` 接口、gRPC/HTTP server 构造、registry endpoint 解析、accept loop 与标准 server middleware chain。
 
-本目录不实现业务 handler，也不承载认证/授权策略；业务中间件通过切片 `append` 挂到 chain 后面。
-
 ## 子目录职责
 
 | 目录 | 职责 |
@@ -24,8 +22,8 @@
 ## 装配语义
 
 - gRPC/HTTP server 都从 `corev1.Server_*` 读取 listen、timeout、TLS、registry 配置。
-- TLS 构造统一调用 `security/tls`；不要在协议子包复制 PEM 解析。
-- registry endpoint 解析失败在启动期 panic，避免服务以错误地址注册。
+- TLS 构造统一调用 `security/tls`，协议子包共享 PEM 解析。
+- registry endpoint 解析失败时在启动期 panic，防止注册错误地址。
 - HTTP 额外负责 CORS、`/metrics`、`/healthz`、`/readyz` 与 swagger 注册。
 - 服务 registrar 在 server 创建后执行。
 
@@ -33,16 +31,15 @@
 
 `middleware.NewChainBuilder(l).Build()` 固定顺序：recovery、可选 tracing、logging、默认 ratelimit、proto validate、可选 metrics。
 
-返回值是 `[]middleware.Middleware`；没有 fluent `Append`。业务侧用 Go 内建 `append(ms, audit, authn, authz, ...)` 调整后续中间件。
+`middleware.NewChainBuilder(l).Build()` 返回 `[]middleware.Middleware`；调用方使用 `append(ms, additionalMiddleware...)` 追加中间件。
 
-`whitelist` 是 operation whitelist，不是 IP 白名单或网络访问控制。
+`whitelist` 匹配 operation 白名单，而非 IP 白名单或网络访问控制。
 
 ## 常见反模式
 
-- 在 server 目录写业务 handler 或 service 领域逻辑。
-- 把 authn/authz 强塞进默认 chain，导致所有服务不可配置。
-- 将 whitelist 当成 IP allowlist。
-- 在 HTTP/gRPC 子包各自实现不同的 TLS/registry 解析规则。
+- 在 server 目录写 service handler 或领域逻辑。
+- 将 whitelist 当作 IP allowlist。
+- 在 HTTP/gRPC 子包分别实现 TLS 或 registry 解析。
 
 ## 测试
 
@@ -50,4 +47,4 @@
 go test ./transport/server/...
 ```
 
-修改 middleware 顺序时，同时检查 audit collector 外层挂载要求和 authn/authz 短路审计路径。
+修改 middleware 顺序时，同时检查 audit collector 的挂载位置和附加中间件的短路路径。

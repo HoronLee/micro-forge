@@ -5,7 +5,7 @@
 
 ## 模块定位
 
-`obs` 承载框架可观测性能力：日志、OpenTelemetry tracing、Prometheus metrics、审计事件。它提供运行时装配与适配层，不定义业务指标语义、业务审计模型或领域日志策略。
+`obs` 提供日志、OpenTelemetry tracing、Prometheus metrics 与 CloudEvents Audit 的运行时装配和适配层。
 
 ## 子目录职责
 
@@ -18,21 +18,19 @@
 
 ## 边界约束
 
-- `obs` 不承载认证、授权或 transport 业务逻辑。
-- TLS/CA 解析使用 `security/tls`，不要在 tracing/logger/audit 中复制证书加载逻辑。
-- logger 默认从 `corev1.Bootstrap.obs.log` 读取配置；调用方必须执行返回的 closer；Kratos v3 日志接入应直接使用 `*slog.Logger`，不要恢复旧 adapter。
-- tracing endpoint 为空时初始化返回 noop cleanup，不应强制报错。
-- metrics 默认从 `corev1.Bootstrap.obs.metrics` 读取配置；启用后使用 OTel `MeterProvider` + 私有 Prometheus registry，调用方必须执行返回的 cleanup。
-- 业务自定义指标应通过 `metrics.Metrics.Meter(name)` 创建 OTel instruments；不要假设 Prometheus 默认 registry 或 `promauto.New*` 会自动出现在 Servora `/metrics`。
-- audit runtime 以 CloudEvents `Auditor.Emit` 为边界；authn/authz 失败/拒绝事件由安全包在配置 auditor 后直接发送。
+- TLS/CA 解析统一使用 `security/tls`，tracing、logger 和 audit 复用该实现。
+- logger 默认从 `corev1.Bootstrap.obs.log` 读取配置；调用方必须执行返回的 closer；Kratos v3 日志接入使用 `*slog.Logger`。
+- tracing endpoint 为空时初始化返回 noop cleanup。
+- metrics 默认从 `corev1.Bootstrap.obs.metrics` 读取配置；启用后使用 OTel `MeterProvider` 和私有 Prometheus registry，调用方必须执行返回的 cleanup。
+- 业务自定义指标通过 `metrics.Metrics.Meter(name)` 创建 OTel instruments。
+- audit runtime 通过 CloudEvents `Auditor.Emit` 发送事件。
 
 ## 常见反模式
 
 - 在 logger 中硬编码业务字段或服务名。
 - 在 tracing/metrics 中发明独立配置结构绕过 Bootstrap proto。
-- 在 metrics 中把服务名当作 OTel Meter name；服务身份属于 Resource，Meter name 属于 instrumentation scope。
+- 在 metrics 中把服务名当作 OTel Meter name；服务名属于 Resource，Meter name 属于 instrumentation scope。
 - 把原生 Prometheus 默认 registry 当作 Servora `/metrics` 的扩展点。
-- 在 audit 中反向 import `security/*` 实现包或业务资源模型。
 - 忘记关闭 logger/OTel 返回的 cleanup/closer。
 
 ## 测试

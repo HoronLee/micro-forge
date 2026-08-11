@@ -47,11 +47,9 @@ export type AuditMode =
   // UNSPECIFIED inherits the service-level default; treated as DISABLED if no
   // service default is declared.
   | 'AUDIT_MODE_UNSPECIFIED';
-// AuditRule is the RPC audit on/off switch. It intentionally carries only
-// mode: event type, severity, field extraction and CloudEvents extensions are
-// the responsibility of the event producer (authn, authz, CRUD generator, or
-// business code). Keeping this annotation minimal prevents it from becoming a
-// mixed DSL.
+// AuditRule is the RPC audit on/off switch. It carries mode; event type,
+// severity, field extraction and CloudEvents extensions are supplied by the
+// event producer. Keeping the annotation focused preserves stable merge semantics.
 export type AuditRule = {
   mode?: AuditMode;
 };

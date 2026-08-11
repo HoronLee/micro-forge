@@ -76,11 +76,9 @@ func (AuditMode) EnumDescriptor() ([]byte, []int) {
 	return file_servora_audit_v1_annotations_proto_rawDescGZIP(), []int{0}
 }
 
-// AuditRule is the RPC audit on/off switch. It intentionally carries only
-// mode: event type, severity, field extraction and CloudEvents extensions are
-// the responsibility of the event producer (authn, authz, CRUD generator, or
-// business code). Keeping this annotation minimal prevents it from becoming a
-// mixed DSL.
+// AuditRule is the RPC audit on/off switch. It carries mode; event type,
+// severity, field extraction and CloudEvents extensions are supplied by the
+// event producer. Keeping the annotation focused preserves stable merge semantics.
 type AuditRule struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Mode          AuditMode              `protobuf:"varint,1,opt,name=mode,proto3,enum=servora.audit.v1.AuditMode" json:"mode,omitempty"`

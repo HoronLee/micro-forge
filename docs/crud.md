@@ -302,7 +302,7 @@ curl --get 'http://127.0.0.1:28080/v1/tenants/acme/users' \
 - token fingerprint 绑定资源类型、collection、规范化 filter、最终稳定排序、比较 profile 和业务 scope；不绑定 `page_size` 或当前 `skip`。
 - filter、order、collection、scope 或 tombstone 可见范围改变后，旧 token 会返回 `INVALID_PAGE_TOKEN`。
 - fingerprint 无条件包含框架私有 filter profile `servora.crud.filter.v1`，包括空 filter 和普通 Exact filter。该 profile 首次启用后，升级前生成的 v1 token 会因 fingerprint 失配返回 `INVALID_PAGE_TOKEN`；payload schema 和 `CurrentPageTokenVersion` 仍为 v1。
-- token 不授予权限。每页查询都必须重新应用当前 authn/authz 与业务 scope。
+- token 保存续页状态；每页查询重新应用当前业务 scope，并将其纳入 fingerprint 和查询条件。
 - 默认 codec 是 deterministic Proto binary + unpadded Base64URL，未签名。需要完整性或保密性时，通过 `PageTokenCodec` 替换；不要让客户端依赖内部 payload。
 - Timestamp cursor 同时保存 UTC instant 与原始整分钟时区 offset；offset 只用于重建 SQL keyset 参数，避免 SQLite 文本时间在 Proto UTC 归一化后改变续页比较值。非法或错配 offset 会在数据库访问前返回 `INVALID_PAGE_TOKEN`。
 

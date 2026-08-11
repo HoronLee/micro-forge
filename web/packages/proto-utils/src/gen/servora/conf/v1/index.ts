@@ -41,7 +41,7 @@ function encodeMultiSegmentPath(value: unknown): string {
 // SectionRule 声明一个配置 message 在外部 yaml / json 配置中的定位键。
 // 应用方通过 bootstrap.Scan 按该 key 在 kratos config 中定向 scan。
 export type SectionRule = {
-  // 配置文件中的定位键（支持 dotted path，如 "audit" 或 "authn.oidc"）。
+  // 配置文件中的定位键（支持 dotted path，如 "audit" 或 "data.redis"）。
   // 不应留空。
   key?: string;
   // 是否允许该 section 在配置中缺失而不报错。
