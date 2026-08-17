@@ -104,7 +104,7 @@ service 使用 generated name helper 或 Plan 解析 canonical name；不要手�
 
 公开可运行的 User example 使用嵌套 pattern `tenants/{tenant}/users/{user}`，因此标准 Create/List request 都携带 `REQUIRED parent`。它验证的是嵌套资源的完整 runtime 组合，不是顶层资源准入。
 
-单一顶层 pattern 没有资源 parent。以下 Realm 只用于说明公共合同与 service 组合，不会向 `servora-platform/app/example` 增加第二个业务资源：
+单一顶层 pattern 没有资源 parent。以下 Realm 只用于说明公共合同与 service 组合，不会向 `plateau/app/example` 增加第二个业务资源：
 
 ```proto
 message Realm {
@@ -600,10 +600,10 @@ just web-typecheck
 just web-build
 ```
 
-发布前由开发者显式准备依赖并运行。`servora-platform/docker-compose.yaml` 提供与本地验证一致的 PostgreSQL 18 服务：
+发布前由开发者显式准备依赖并运行。`plateau/docker-compose.yaml` 提供与本地验证一致的 PostgreSQL 18 服务：
 
 ```bash
-cd ../servora-platform
+cd ../plateau
 docker compose up -d --wait postgres
 
 cd ../servora
@@ -618,7 +618,7 @@ SERVORA_ENT_POSTGRES_DSN='postgres://postgres:postgres@127.0.0.1:5432/servora_pl
 
 ## 参考应用
 
-可运行黄金路径位于 [`servora-platform/app/example`](https://github.com/Servora-Kit/servora-platform/tree/main/app/example)：
+可运行黄金路径位于 [`plateau/app/example`](https://github.com/Servora-Kit/plateau/tree/main/app/example)：
 
 - 单一 `example.servora.dev/User`，pattern `tenants/{tenant}/users/{user}`；
 - service → biz → data → Ent 分层；
@@ -628,10 +628,10 @@ SERVORA_ENT_POSTGRES_DSN='postgres://postgres:postgres@127.0.0.1:5432/servora_pl
 - INPUT_ONLY `temporary_password` → private `password_hash`；
 - Vue 控制台只消费 generated TypeScript client 与 `@servora/proto-utils`。
 
-本地跨仓回归必须通过 Servora-Kit 顶层 `go.work` 使用当前框架源码；service Makefile 会解析并校验该 workspace，而不是静默使用 `servora-platform/go.work` 中已发布的框架版本：
+本地跨仓回归必须通过 Servora-Kit 顶层 `go.work` 使用当前框架源码；service Makefile 会解析并校验该 workspace，而不是静默使用 `plateau/go.work` 中已发布的框架版本：
 
 ```bash
-cd servora-platform/app/example/service
+cd plateau/app/example/service
 SERVORA_EXAMPLE_SQLITE_DSN='file:servora_reference_live?mode=memory&cache=shared&_fk=1' \
   make test.integration
 ```
@@ -639,7 +639,7 @@ SERVORA_EXAMPLE_SQLITE_DSN='file:servora_reference_live?mode=memory&cache=shared
 本地运行：
 
 ```bash
-cd servora-platform/app/example/service
+cd plateau/app/example/service
 make run
 
 cd ../web

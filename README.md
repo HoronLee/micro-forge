@@ -148,7 +148,7 @@ if err := bootstrap.Scan(rt, redisCfg); err != nil {
 
 Servora 提供了声明式、 AIP 风格约束的 CRUD 生态框架，用户只需要在 [API Proto](./api/protos/servora/example/v1/example.proto) 中定义 AIP 规范的资源 message ，Servora 就会利用 `protoc-gen-servora-crud` 插件生成 Go 、 TypeScript 关于 分页、排序以及过滤的辅助函数，以及关于 proto 生成的代码与 data 层所使用的 orm框架字段的绑定关系代码。通过 CRUD 生态，用户可以非常规范、方便地完成增删改查的 API 设计与业务开发。
 
-具体使用示例可见：[servora-platform/example.service](https://github.com/Servora-Kit/servora-platform/tree/main/app/example)
+具体使用示例可见：[plateau/example.service](https://github.com/Servora-Kit/plateau/tree/main/app/example)
 
 #### 审计
 
@@ -205,7 +205,7 @@ Servora 默认接入 [OpenTelemetry](https://opentelemetry.io/) SDK，开箱即�
 - **Logging** — `obs/logger` 提供基于 `slog` 的结构化日志，支持 stdout/file/OTel fanout
 - **Audit** — 详见上文「Proto 契约化 → 审计」段，事件以 [CloudEvents](https://cloudevents.io/) 格式投递
 
-本地起一套 Prometheus + Jaeger UI + Grafana 即可看到全链路指标与 trace（参考 [servora-platform](https://github.com/Servora-Kit/servora-platform) 的 compose 配置；`servora-example` 只内置 Consul / Jaeger / OTel Collector，可直接 curl `/metrics` 做 smoke）。
+本地起一套 Prometheus + Jaeger UI + Grafana 即可看到全链路指标与 trace（参考 [plateau](https://github.com/Servora-Kit/plateau) 的 compose 配置；`servora-example` 只内置 Consul / Jaeger / OTel Collector，可直接 curl `/metrics` 做 smoke）。
 
 ## 贡献🎉
 
