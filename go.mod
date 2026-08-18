@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	entgo.io/ent v0.14.5
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
-	github.com/Servora-Kit/servora/api/gen v0.8.11
+	github.com/Servora-Kit/servora/api/gen v0.9.0
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -25,6 +25,7 @@ require (
 	github.com/hashicorp/consul/api v1.34.2
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jinzhu/copier v0.4.0
+	github.com/lyft/protoc-gen-star/v2 v2.0.4
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/nacos-group/nacos-sdk-go v1.1.6
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
@@ -175,7 +176,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/lyft/protoc-gen-star/v2 v2.0.4 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
