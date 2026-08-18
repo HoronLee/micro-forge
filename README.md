@@ -57,14 +57,17 @@ import (
 
     corev1 "github.com/Servora-Kit/servora/api/gen/go/servora/core/v1"
     svrgrpc "github.com/Servora-Kit/servora/transport/server/grpc"
+    svrmw "github.com/Servora-Kit/servora/transport/server/middleware"
     pb "myapp/api/gen/go/myapp/user/v1"
     kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 )
 
 func NewGRPCServer(c *corev1.Server, l *slog.Logger, svc *UserService) *kgrpc.Server {
+    glog := l.With("scope", "myapp/server/grpc")
+    mw := svrmw.NewChainBuilder(glog).Build()
     return svrgrpc.NewServer(
         svrgrpc.WithConfig(c),
-        svrgrpc.WithLogger(l),
+        svrgrpc.WithMiddleware(mw...),
         svrgrpc.WithServices(func(s *kgrpc.Server) {
             pb.RegisterUserServiceServer(s, svc)
         }),

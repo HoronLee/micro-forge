@@ -17,7 +17,6 @@ import (
 	"github.com/go-kratos/kratos/v3/middleware/recovery"
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"log/slog"
 
 	corev1 "github.com/Servora-Kit/servora/api/gen/go/servora/core/v1"
 )
@@ -47,21 +46,6 @@ func TestNewServer_WithNilConfig(t *testing.T) {
 	srv := NewServer(WithConfig(nil))
 	if srv == nil {
 		t.Fatal("expected non-nil server with nil config")
-	}
-}
-
-func TestNewServer_WithLogger(t *testing.T) {
-	logger := slog.Default()
-	srv := NewServer(WithLogger(logger))
-	if srv == nil {
-		t.Fatal("expected non-nil server")
-	}
-}
-
-func TestNewServer_WithNilLogger(t *testing.T) {
-	srv := NewServer(WithLogger(nil))
-	if srv == nil {
-		t.Fatal("expected non-nil server with nil logger")
 	}
 }
 
@@ -117,7 +101,6 @@ func TestNewServer_FullOptions(t *testing.T) {
 	}
 	srv := NewServer(
 		WithConfig(cfg),
-		WithLogger(slog.Default()),
 		WithMiddleware(recovery.Recovery()),
 	)
 	if srv == nil {

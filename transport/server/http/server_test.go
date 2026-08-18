@@ -1,7 +1,6 @@
 package http
 
 import (
-	"log/slog"
 	"testing"
 	"time"
 
@@ -129,21 +128,6 @@ func TestNewServer_WithNilConfig(t *testing.T) {
 	}
 }
 
-func TestNewServer_WithLogger(t *testing.T) {
-	logger := slog.Default()
-	srv := NewServer(WithLogger(logger))
-	if srv == nil {
-		t.Fatal("expected non-nil server")
-	}
-}
-
-func TestNewServer_WithNilLogger(t *testing.T) {
-	srv := NewServer(WithLogger(nil))
-	if srv == nil {
-		t.Fatal("expected non-nil server with nil logger")
-	}
-}
-
 func TestNewServer_WithMiddleware(t *testing.T) {
 	srv := NewServer(WithMiddleware(recovery.Recovery()))
 	if srv == nil {
@@ -226,7 +210,6 @@ func TestNewServer_FullOptions(t *testing.T) {
 	}
 	srv := NewServer(
 		WithConfig(cfg),
-		WithLogger(slog.Default()),
 		WithMiddleware(recovery.Recovery()),
 		WithCORS(corsConf),
 	)

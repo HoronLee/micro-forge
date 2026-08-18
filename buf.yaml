@@ -7,7 +7,6 @@ modules:
 deps:
   - buf.build/bufbuild/protovalidate
   - buf.build/googleapis/googleapis
-  - buf.build/go-wind/redact
 
 breaking:
   use:

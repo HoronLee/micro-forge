@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+// Package redact provides Servora-owned field redaction annotations.
+package servora.redact.v3;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/Servora-Kit/servora/api/gen/go/servora/redact/v3;redactv3";
+
+// Redaction rules applied at the file level.
+extend google.protobuf.FileOptions {
+  bool file_skip = 90102;
+}
+
+// Legacy service-level options are retained in the forked descriptor for
+// annotation compatibility. Servora's generator does not emit transport wrappers.
+extend google.protobuf.ServiceOptions {
+  bool service_skip = 54123;
+  bool internal_service = 54124;
+  uint32 internal_service_code = 54125;
+  string internal_service_err_message = 54126;
+}
+
+// Legacy method-level options are retained for descriptor compatibility.
+extend google.protobuf.MethodOptions {
+  bool method_skip = 54123;
+  bool internal_method = 54124;
+  uint32 internal_method_code = 54125;
+  string internal_method_err_message = 54126;
+}
+
+// Legacy message-level options are retained for descriptor compatibility.
+extend google.protobuf.MessageOptions {
+  bool nil = 54123;
+  bool empty = 54124;
+  bool ignored = 54125;
+}
+
+// Field-level redaction rules consumed by Servora's generator.
+extend google.protobuf.FieldOptions {
+  FieldRules value = 54123;
+}
+
+message FieldRules {
+  oneof values {
+    float float = 2;
+    double double = 3;
+    int32 int32 = 4;
+    int64 int64 = 5;
+    uint32 uint32 = 6;
+    uint64 uint64 = 7;
+    sint32 sint32 = 8;
+    sint64 sint64 = 9;
+    fixed32 fixed32 = 10;
+    fixed64 fixed64 = 11;
+    sfixed32 sfixed32 = 12;
+    sfixed64 sfixed64 = 13;
+    bool bool = 14;
+    string string = 15;
+    bytes bytes = 16;
+    int32 enum = 17;
+    MessageRules message = 19;
+    ElementRules element = 20;
+  }
+}
+
+message MessageRules {
+  bool skip = 1;
+  bool empty = 2;
+  bool nil = 3;
+  bool apply = 4;
+}
+
+message ElementRules {
+  bool empty = 1;
+  bool nested = 2;
+  FieldRules item = 3;
+}

@@ -33,7 +33,7 @@ plugins:
           - lang=go
 
     # generate redact code (field-level log redaction)
-    - local: protoc-gen-go-redact
+    - local: protoc-gen-redact
       out: api/gen/go
       opt:
           - paths=source_relative

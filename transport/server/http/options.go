@@ -1,7 +1,6 @@
 package http
 
 import (
-	"log/slog"
 	"net/http"
 
 	corev1 "github.com/Servora-Kit/servora/api/gen/go/servora/core/v1"
@@ -19,7 +18,6 @@ type ServerOption func(*serverOptions)
 
 type serverOptions struct {
 	conf           *corev1.Server_HTTP
-	logger         *slog.Logger
 	middleware     []middleware.Middleware
 	cors           *corsv1.CORS
 	metricsHandler http.Handler
@@ -32,12 +30,6 @@ type serverOptions struct {
 func WithConfig(c *corev1.Server_HTTP) ServerOption {
 	return func(o *serverOptions) {
 		o.conf = c
-	}
-}
-
-func WithLogger(l *slog.Logger) ServerOption {
-	return func(o *serverOptions) {
-		o.logger = l
 	}
 }
 
