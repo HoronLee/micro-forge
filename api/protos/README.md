@@ -11,7 +11,7 @@ Proto files are organized in these top-level groups under `servora/`:
 | Annotations (flat) | Extension annotations consumed by `protoc-gen-servora-*` plugins. Each namespace holds a single `annotations.proto`. | `audit/v1` / `conf/v1` |
 | `redact/v3/` | Field-level log-redaction annotations consumed by `protoc-gen-redact`. | `redact.proto` |
 | `core/v1/` | Framework startup bootstrap model. | `bootstrap.proto` (Bootstrap / App / Server / Data / Registry / Source / Observability) |
-| `contrib/<域>/v1/` | Optional ecosystem sections consumed by contrib packages or business bootstrap code. | `db/redis` / `kafka` / `mail` / `db/clickhouse` |
+| `contrib/<域>/v1/` | Optional ecosystem sections consumed by contrib packages or business bootstrap code. | `db/redis` / `kafka` |
 | `security/<域>/v1/` | Security primitives shared by runtime packages. | `tls` |
 | `obs/<域>/v1/` | Observability runtime configuration consumed by obs packages. | `audit` |
 | Neutral schema | CNCF / third-party envelope schemas that do not fit the categories above. | `cloudevents/v1/` |
@@ -26,8 +26,6 @@ Proto files are organized in these top-level groups under `servora/`:
 | `servora.transport.http.cors.v1` | HTTP CORS middleware configuration. Defaults are declared with proto field annotations and applied through generated `ApplyDefaults()`. |
 | `servora.contrib.db.redis.v1` | Redis client configuration; section key `redis` (optional), loaded explicitly with `bootstrap.Scan` and consumed by `contrib/db/redis`. |
 | `servora.contrib.kafka.v1` | Kafka client configuration; section key `kafka` (optional), loaded explicitly with `bootstrap.Scan` and consumed by `contrib/kafka`. |
-| `servora.contrib.db.clickhouse.v1` | ClickHouse client configuration; section key `clickhouse` (optional), loaded explicitly with `bootstrap.Scan` and consumed by `contrib/db/clickhouse`. |
-| `servora.contrib.mail.v1` | SMTP and sender identity configuration provided as a proto-only convenience section. |
 | `servora.security.tls.v1` | Shared TLS configuration referenced by core server/client endpoint config and consumed by `security/tls`. |
 | `servora.audit.v1` | `servora/audit/v1/annotations.proto` 中的审计注解；供 `protoc-gen-servora-audit` 使用（extension `5010x`，支持 service-level `service_default` + 三态 `AuditMode`；`AuditRule` 只携带 RPC audit 开关）。 |
 | `servora.redact.v3` | `servora/redact/v3/redact.proto` 中的 field-level 日志脱敏注解；供 `protoc-gen-redact` 使用，生成非破坏性的 `Redact() string`。 |

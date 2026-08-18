@@ -1,6 +1,6 @@
 # contrib
 
-Servora 可选第三方生态接线空间，包含 database、cache、Kafka、Kubernetes runtime 与 Mail Proto 配置。
+Servora 可选第三方生态接线空间，包含 database、cache、Kafka 与 Kubernetes runtime。
 
 ## 组织边界
 

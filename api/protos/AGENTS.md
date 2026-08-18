@@ -23,8 +23,8 @@ api/protos/
     ├── crud/v1/                     # CRUD framework errors and page-token payload
     ├── errors/v1/                   # error-code annotation extensions
     ├── redact/v3/                   # field-level log-redaction annotations
-    ├── contrib/{kafka,mail}/v1/     # optional section schema
-    ├── contrib/db/{redis,clickhouse}/v1/ # database section schema
+    ├── contrib/kafka/v1/            # optional section schema
+    ├── contrib/db/redis/v1/         # database section schema
     ├── obs/audit/v1/                # audit runtime config schema
     ├── security/tls/v1/             # shared TLS configuration
     └── transport/http/cors/v1/      # transport config schema
