@@ -8,6 +8,7 @@ package redispb
 
 import (
 	_ "github.com/Servora-Kit/servora/api/gen/go/servora/conf/v1"
+	v1 "github.com/Servora-Kit/servora/api/gen/go/servora/security/tls/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -33,6 +34,7 @@ type Redis struct {
 	DialTimeout   *durationpb.Duration   `protobuf:"bytes,6,opt,name=dial_timeout,json=dialTimeout,proto3" json:"dial_timeout,omitempty"`
 	ReadTimeout   *durationpb.Duration   `protobuf:"bytes,7,opt,name=read_timeout,json=readTimeout,proto3" json:"read_timeout,omitempty"`
 	WriteTimeout  *durationpb.Duration   `protobuf:"bytes,8,opt,name=write_timeout,json=writeTimeout,proto3" json:"write_timeout,omitempty"`
+	Tls           *v1.TLS                `protobuf:"bytes,9,opt,name=tls,proto3" json:"tls,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -123,11 +125,18 @@ func (x *Redis) GetWriteTimeout() *durationpb.Duration {
 	return nil
 }
 
+func (x *Redis) GetTls() *v1.TLS {
+	if x != nil {
+		return x.Tls
+	}
+	return nil
+}
+
 var File_servora_contrib_db_redis_v1_config_proto protoreflect.FileDescriptor
 
 const file_servora_contrib_db_redis_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"(servora/contrib/db/redis/v1/config.proto\x12\x1bservora.contrib.db.redis.v1\x1a\x1egoogle/protobuf/duration.proto\x1a!servora/conf/v1/annotations.proto\"\xc9\x02\n" +
+	"(servora/contrib/db/redis/v1/config.proto\x12\x1bservora.contrib.db.redis.v1\x1a\x1egoogle/protobuf/duration.proto\x1a!servora/conf/v1/annotations.proto\x1a$servora/security/tls/v1/config.proto\"\xf9\x02\n" +
 	"\x05Redis\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x12\x1b\n" +
@@ -136,7 +145,8 @@ const file_servora_contrib_db_redis_v1_config_proto_rawDesc = "" +
 	"\x02db\x18\x05 \x01(\x05R\x02db\x12<\n" +
 	"\fdial_timeout\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\vdialTimeout\x12<\n" +
 	"\fread_timeout\x18\a \x01(\v2\x19.google.protobuf.DurationR\vreadTimeout\x12>\n" +
-	"\rwrite_timeout\x18\b \x01(\v2\x19.google.protobuf.DurationR\fwriteTimeout:\r\x82\xce\x18\t\n" +
+	"\rwrite_timeout\x18\b \x01(\v2\x19.google.protobuf.DurationR\fwriteTimeout\x12.\n" +
+	"\x03tls\x18\t \x01(\v2\x1c.servora.security.tls.v1.TLSR\x03tls:\r\x82\xce\x18\t\n" +
 	"\x05redis\x10\x01BOZMgithub.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1;redispbb\x06proto3"
 
 var (
@@ -155,16 +165,18 @@ var file_servora_contrib_db_redis_v1_config_proto_msgTypes = make([]protoimpl.Me
 var file_servora_contrib_db_redis_v1_config_proto_goTypes = []any{
 	(*Redis)(nil),               // 0: servora.contrib.db.redis.v1.Redis
 	(*durationpb.Duration)(nil), // 1: google.protobuf.Duration
+	(*v1.TLS)(nil),              // 2: servora.security.tls.v1.TLS
 }
 var file_servora_contrib_db_redis_v1_config_proto_depIdxs = []int32{
 	1, // 0: servora.contrib.db.redis.v1.Redis.dial_timeout:type_name -> google.protobuf.Duration
 	1, // 1: servora.contrib.db.redis.v1.Redis.read_timeout:type_name -> google.protobuf.Duration
 	1, // 2: servora.contrib.db.redis.v1.Redis.write_timeout:type_name -> google.protobuf.Duration
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	2, // 3: servora.contrib.db.redis.v1.Redis.tls:type_name -> servora.security.tls.v1.TLS
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_servora_contrib_db_redis_v1_config_proto_init() }

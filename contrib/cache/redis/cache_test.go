@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	redispb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1"
 	dbredis "github.com/Servora-Kit/servora/contrib/db/redis"
 )
 
@@ -33,8 +34,7 @@ func newTestClient(t *testing.T) *dbredis.Client {
 	if testing.Short() {
 		t.Skip("skipping: requires Redis")
 	}
-	cfg := &dbredis.Config{Addr: "localhost:6379", DB: 15}
-	c, cleanup, err := dbredis.NewClient(cfg, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	c, cleanup, err := dbredis.New(&redispb.Redis{Addr: "localhost:6379", Db: 15}, slog.New(slog.NewTextHandler(os.Stderr, nil)))
 	if err != nil {
 		t.Skipf("redis not available: %v", err)
 	}

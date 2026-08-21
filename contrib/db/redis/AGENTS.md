@@ -10,8 +10,8 @@
 ## 当前实现事实
 
 - 默认超时：`Dial=5s`、`Read=3s`、`Write=3s`
-- `NewConfigFromProto` 从 `servora.contrib.db.redis.v1.Redis` 构造本地配置；业务通过 `bootstrap.Scan(rt, redisCfg)` 显式加载 `redis` optional section
-- `NewClient` 会先 `Ping` 校验连接，并返回 `cleanup func()`
+- `New` 直接接收 `servora.contrib.db.redis.v1.Redis`，业务通过 `bootstrap.Scan(rt, redisCfg)` 显式加载 `redis` section
+- `New` 完成配置转换、TLS 构建和 `Ping` 连通性校验，并返回 `cleanup func()`
 - 初始化日志统一带 `scope=redis/contrib`
 - 当前一级目录没有单独测试文件，测试约定仍以包级 `go test` 为主
 
@@ -33,8 +33,8 @@
 ## 使用示例
 
 ```go
-cfg := &redis.Config{Addr: "localhost:6379", DB: 0}
-client, cleanup, err := redis.NewClient(cfg, l)
+cfg := &redispb.Redis{Addr: "localhost:6379", Db: 0}
+client, cleanup, err := redis.New(cfg, l)
 defer cleanup()
 
 _ = client.Set(context.Background(), "key", "value", time.Hour)

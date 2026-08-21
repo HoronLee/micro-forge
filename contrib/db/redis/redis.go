@@ -2,11 +2,15 @@ package redis
 
 import (
 	"context"
+	stdtls "crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"time"
 
 	redispb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1"
+	svrtls "github.com/Servora-Kit/servora/security/tls"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -29,11 +33,12 @@ type Config struct {
 	DialTimeout  time.Duration
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
+	TLSConfig    *stdtls.Config
 }
 
-func NewConfigFromProto(cfg *redispb.Redis) *Config {
+func configFromProto(cfg *redispb.Redis) (*Config, error) {
 	if cfg == nil {
-		return nil
+		return nil, nil
 	}
 
 	config := &Config{
@@ -61,44 +66,48 @@ func NewConfigFromProto(cfg *redispb.Redis) *Config {
 		config.WriteTimeout = DefaultWriteTimeout
 	}
 
-	return config
+	var serverName string
+	if cfg.GetTls().GetEnable() {
+		host, _, err := net.SplitHostPort(cfg.GetAddr())
+		if err != nil || host == "" {
+			return nil, fmt.Errorf("redis TLS requires addr in host:port form: %q", cfg.GetAddr())
+		}
+		serverName = host
+	}
+	tlsConfig, err := svrtls.BuildClientTLSForServer(cfg.GetTls(), serverName)
+	if err != nil {
+		return nil, fmt.Errorf("build redis TLS config: %w", err)
+	}
+	config.TLSConfig = tlsConfig
+	return config, nil
 }
 
-func NewClient(cfg *Config, l *slog.Logger) (*Client, func(), error) {
+// New creates a Redis client from the shared Redis configuration, verifies the connection, and returns cleanup.
+func New(cfg *redispb.Redis, l *slog.Logger) (*Client, func(), error) {
+	config, err := configFromProto(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	return newClient(config, l)
+}
+
+func newClient(cfg *Config, l *slog.Logger) (*Client, func(), error) {
 	if cfg == nil {
 		return nil, nil, errors.New("redis config is nil")
 	}
-
-	dialTimeout := cfg.DialTimeout
-	if dialTimeout == 0 {
-		dialTimeout = DefaultDialTimeout
-	}
-	readTimeout := cfg.ReadTimeout
-	if readTimeout == 0 {
-		readTimeout = DefaultReadTimeout
-	}
-	writeTimeout := cfg.WriteTimeout
-	if writeTimeout == 0 {
-		writeTimeout = DefaultWriteTimeout
+	if l == nil {
+		l = slog.Default()
 	}
 
 	log := l.With("scope", "redis/contrib")
+	rdb := redis.NewClient(newRedisOptions(cfg))
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         cfg.Addr,
-		Username:     cfg.Username,
-		Password:     cfg.Password,
-		DB:           cfg.DB,
-		DialTimeout:  dialTimeout,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), rdb.Options().DialTimeout)
 	defer cancel()
 	if err := rdb.Ping(ctx).Err(); err != nil {
+		_ = rdb.Close()
 		log.Error("redis ping failed", "err", err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("redis ping: %w", err)
 	}
 	log.Info("redis client initialized")
 
@@ -111,6 +120,31 @@ func NewClient(cfg *Config, l *slog.Logger) (*Client, func(), error) {
 		rdb: rdb,
 		log: log,
 	}, cleanup, nil
+}
+
+func newRedisOptions(cfg *Config) *redis.Options {
+	dialTimeout := cfg.DialTimeout
+	if dialTimeout == 0 {
+		dialTimeout = DefaultDialTimeout
+	}
+	readTimeout := cfg.ReadTimeout
+	if readTimeout == 0 {
+		readTimeout = DefaultReadTimeout
+	}
+	writeTimeout := cfg.WriteTimeout
+	if writeTimeout == 0 {
+		writeTimeout = DefaultWriteTimeout
+	}
+	return &redis.Options{
+		Addr:         cfg.Addr,
+		Username:     cfg.Username,
+		Password:     cfg.Password,
+		DB:           cfg.DB,
+		DialTimeout:  dialTimeout,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		TLSConfig:    cfg.TLSConfig,
+	}
 }
 
 // Ping 测试连接
