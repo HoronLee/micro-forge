@@ -11,7 +11,7 @@ import (
 
 	redispb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1"
 	svrtls "github.com/Servora-Kit/servora/security/tls"
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 const (
@@ -19,11 +19,6 @@ const (
 	DefaultReadTimeout  = 3 * time.Second
 	DefaultWriteTimeout = 3 * time.Second
 )
-
-type Client struct {
-	rdb *redis.Client
-	log *slog.Logger
-}
 
 type Config struct {
 	Addr         string
@@ -83,7 +78,7 @@ func configFromProto(cfg *redispb.Redis) (*Config, error) {
 }
 
 // New creates a Redis client from the shared Redis configuration, verifies the connection, and returns cleanup.
-func New(cfg *redispb.Redis, l *slog.Logger) (*Client, func(), error) {
+func New(cfg *redispb.Redis, l *slog.Logger) (*goredis.Client, func(), error) {
 	config, err := configFromProto(cfg)
 	if err != nil {
 		return nil, nil, err
@@ -91,7 +86,7 @@ func New(cfg *redispb.Redis, l *slog.Logger) (*Client, func(), error) {
 	return newClient(config, l)
 }
 
-func newClient(cfg *Config, l *slog.Logger) (*Client, func(), error) {
+func newClient(cfg *Config, l *slog.Logger) (*goredis.Client, func(), error) {
 	if cfg == nil {
 		return nil, nil, errors.New("redis config is nil")
 	}
@@ -100,7 +95,7 @@ func newClient(cfg *Config, l *slog.Logger) (*Client, func(), error) {
 	}
 
 	log := l.With("scope", "redis/contrib")
-	rdb := redis.NewClient(newRedisOptions(cfg))
+	rdb := goredis.NewClient(newRedisOptions(cfg))
 
 	ctx, cancel := context.WithTimeout(context.Background(), rdb.Options().DialTimeout)
 	defer cancel()
@@ -116,13 +111,10 @@ func newClient(cfg *Config, l *slog.Logger) (*Client, func(), error) {
 		_ = rdb.Close()
 	}
 
-	return &Client{
-		rdb: rdb,
-		log: log,
-	}, cleanup, nil
+	return rdb, cleanup, nil
 }
 
-func newRedisOptions(cfg *Config) *redis.Options {
+func newRedisOptions(cfg *Config) *goredis.Options {
 	dialTimeout := cfg.DialTimeout
 	if dialTimeout == 0 {
 		dialTimeout = DefaultDialTimeout
@@ -135,7 +127,7 @@ func newRedisOptions(cfg *Config) *redis.Options {
 	if writeTimeout == 0 {
 		writeTimeout = DefaultWriteTimeout
 	}
-	return &redis.Options{
+	return &goredis.Options{
 		Addr:         cfg.Addr,
 		Username:     cfg.Username,
 		Password:     cfg.Password,
@@ -147,53 +139,3 @@ func newRedisOptions(cfg *Config) *redis.Options {
 	}
 }
 
-// Ping 测试连接
-func (c *Client) Ping(ctx context.Context) error {
-	return c.rdb.Ping(ctx).Err()
-}
-
-// Set 存储键值对
-func (c *Client) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
-	return c.rdb.Set(ctx, key, value, expiration).Err()
-}
-
-// Get 获取值
-func (c *Client) Get(ctx context.Context, key string) (string, error) {
-	return c.rdb.Get(ctx, key).Result()
-}
-
-// Del 删除键
-func (c *Client) Del(ctx context.Context, keys ...string) error {
-	return c.rdb.Del(ctx, keys...).Err()
-}
-
-// GetDel atomically gets the value and deletes the key (Redis >= 6.2).
-func (c *Client) GetDel(ctx context.Context, key string) (string, error) {
-	return c.rdb.GetDel(ctx, key).Result()
-}
-
-// Has 判断键是否存在
-func (c *Client) Has(ctx context.Context, key string) bool {
-	_, err := c.rdb.Get(ctx, key).Result()
-	return err == nil
-}
-
-// Keys 按模式查找键
-func (c *Client) Keys(ctx context.Context, pattern string) ([]string, error) {
-	return c.rdb.Keys(ctx, pattern).Result()
-}
-
-// SAdd 向集合添加成员
-func (c *Client) SAdd(ctx context.Context, key string, members ...any) error {
-	return c.rdb.SAdd(ctx, key, members...).Err()
-}
-
-// SMembers 获取集合所有成员
-func (c *Client) SMembers(ctx context.Context, key string) ([]string, error) {
-	return c.rdb.SMembers(ctx, key).Result()
-}
-
-// Expire 设置键过期时间
-func (c *Client) Expire(ctx context.Context, key string, expiration time.Duration) error {
-	return c.rdb.Expire(ctx, key, expiration).Err()
-}

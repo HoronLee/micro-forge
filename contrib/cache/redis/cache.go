@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	dbredis "github.com/Servora-Kit/servora/contrib/db/redis"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -14,14 +13,14 @@ import (
 // Redis 读取失败时降级为直接调用 loader（缓存故障不阻塞业务）。
 func GetOrSet[T any](
 	ctx context.Context,
-	c *dbredis.Client,
+	c *goredis.Client,
 	key string,
 	ttl time.Duration,
 	loader func(ctx context.Context) (T, error),
 	marshal func(T) (string, error),
 	unmarshal func(string) (T, error),
 ) (T, error) {
-	val, err := c.Get(ctx, key)
+	val, err := c.Get(ctx, key).Result()
 	if err == nil {
 		return unmarshal(val)
 	}
@@ -39,7 +38,7 @@ func GetOrSet[T any](
 
 	// 写回缓存（忽略写入错误，不影响业务返回）
 	if serialized, marshalErr := marshal(result); marshalErr == nil {
-		_ = c.Set(ctx, key, serialized, ttl)
+		_ = c.Set(ctx, key, serialized, ttl).Err()
 	}
 
 	return result, nil
@@ -49,7 +48,7 @@ func GetOrSet[T any](
 // 内置 JSON 序列化/反序列化，适用于最常见的缓存场景。
 func GetOrSetJSON[T any](
 	ctx context.Context,
-	c *dbredis.Client,
+	c *goredis.Client,
 	key string,
 	ttl time.Duration,
 	loader func(ctx context.Context) (T, error),

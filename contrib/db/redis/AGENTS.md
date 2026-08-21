@@ -1,32 +1,30 @@
 # AGENTS.md - contrib/db/redis/
 
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-15 | Updated: 2026-05-25 -->
+<!-- Generated: 2026-03-15 | Updated: 2026-08-21 -->
 
 ## 模块目的
 
-封装 `github.com/redis/go-redis/v9`，统一配置转换、连通性探测、日志与基础操作，并提供通用分布式锁。
+封装 `github.com/redis/go-redis/v9` 的配置约定：将 `servora.contrib.db.redis.v1.Redis` 配置转换为官方客户端（含 TLS 构建与连通性探测），不自行封装 KV 操作，并提供通用分布式锁。
 
 ## 当前实现事实
 
 - 默认超时：`Dial=5s`、`Read=3s`、`Write=3s`
-- `New` 直接接收 `servora.contrib.db.redis.v1.Redis`，业务通过 `bootstrap.Scan(rt, redisCfg)` 显式加载 `redis` section
+- `New` 直接接收 `servora.contrib.db.redis.v1.Redis`，返回官方 `*redis.Client`，不做黑盒封装
 - `New` 完成配置转换、TLS 构建和 `Ping` 连通性校验，并返回 `cleanup func()`
-- 初始化日志统一带 `scope=redis/contrib`
-- 当前一级目录没有单独测试文件，测试约定仍以包级 `go test` 为主
+- 日志仅在构造期打印（`scope=redis/contrib`），客户端本身不持有 logger，业务日志由调用方自行拼装
 
 ## 暴露能力
 
-- `Ping`
-- `Set` / `Get` / `Del` / `Has` / `Keys`
-- `SAdd` / `SMembers`
-- `Expire`
-- `TryLock` / `Lock.Unlock`：基于 SET NX + Lua 的分布式锁
+- `New(cfg, logger) (*redis.Client, func(), error)`：从 proto 配置构造官方客户端并校验连通性
+- `TryLock(ctx, rdb, key, ttl)` / `Lock.Unlock`：基于 SET NX + Lua 的分布式锁
 - Cache-aside helper 位于 `contrib/cache/redis`
+
+KV 读写直接使用 go-redis 官方 API（`Get`/`Set`/`Del`/…），本包不复制一层包装。
 
 ## 边界约束
 
-- 本包负责 Redis 访问、KV helper 和分布式锁，不负责业务缓存键设计或领域失效策略
+- 本包只负责配置转换与连接建立，不封装 KV API、不持有业务日志
 - 不把具体业务对象序列化格式、事件语义或授权语义硬编码到共享 Redis 层
 - 锁是基础设施 helper，不是业务事务补偿框架
 
@@ -37,20 +35,20 @@ cfg := &redispb.Redis{Addr: "localhost:6379", Db: 0}
 client, cleanup, err := redis.New(cfg, l)
 defer cleanup()
 
-_ = client.Set(context.Background(), "key", "value", time.Hour)
+_ = client.Set(context.Background(), "key", "value", time.Hour).Err()
 ```
 
 ### 分布式锁
 
 ```go
-lock, err := client.TryLock(ctx, "order:123:lock", 10*time.Second)
+lock, err := redis.TryLock(ctx, client, "order:123:lock", 10*time.Second)
 if err != nil { /* 锁已被占用或错误 */ }
 defer lock.Unlock(ctx)
 ```
 
 ## 常见反模式
 
-- 在 `contrib/db/redis` 中硬编码业务 key 命名与对象 schema
+- 在 `contrib/db/redis` 中重新封装 go-redis 的 KV 方法或硬编码业务 key 命名
 - 忽略 `cleanup` 或锁释放，造成连接/锁资源泄漏
 
 ## 测试

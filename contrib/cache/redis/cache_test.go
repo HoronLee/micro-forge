@@ -11,6 +11,7 @@ import (
 
 	redispb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1"
 	dbredis "github.com/Servora-Kit/servora/contrib/db/redis"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 type testUser struct {
@@ -29,7 +30,7 @@ func unmarshalUser(s string) (testUser, error) {
 	return u, err
 }
 
-func newTestClient(t *testing.T) *dbredis.Client {
+func newTestClient(t *testing.T) *goredis.Client {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("skipping: requires Redis")
@@ -40,7 +41,7 @@ func newTestClient(t *testing.T) *dbredis.Client {
 	}
 	t.Cleanup(cleanup)
 	t.Cleanup(func() {
-		_ = c.Del(context.Background(), "test:cache:hit", "test:cache:miss", "test:cache:loader-err", "test:cache:json-hit", "test:cache:json-miss")
+		_ = c.Del(context.Background(), "test:cache:hit", "test:cache:miss", "test:cache:loader-err", "test:cache:json-hit", "test:cache:json-miss").Err()
 	})
 	return c
 }
@@ -52,7 +53,7 @@ func TestGetOrSet_CacheHit(t *testing.T) {
 	expected := testUser{ID: 1, Name: "Alice"}
 
 	data, _ := marshalUser(expected)
-	if err := c.Set(ctx, key, data, time.Minute); err != nil {
+	if err := c.Set(ctx, key, data, time.Minute).Err(); err != nil {
 		t.Fatalf("seed cache failed: %v", err)
 	}
 
@@ -92,7 +93,7 @@ func TestGetOrSet_CacheMiss(t *testing.T) {
 		t.Fatalf("expected %+v, got %+v", expected, result)
 	}
 
-	cached, cacheErr := c.Get(ctx, key)
+	cached, cacheErr := c.Get(ctx, key).Result()
 	if cacheErr != nil {
 		t.Fatalf("value should be cached: %v", cacheErr)
 	}
@@ -119,7 +120,7 @@ func TestGetOrSet_LoaderError(t *testing.T) {
 		t.Fatalf("expected loader error, got %v", err)
 	}
 
-	if c.Has(ctx, key) {
+	if n, _ := c.Exists(ctx, key).Result(); n > 0 {
 		t.Fatal("key should not be cached on loader error")
 	}
 }
@@ -131,7 +132,7 @@ func TestGetOrSetJSON_CacheHit(t *testing.T) {
 	expected := testUser{ID: 3, Name: "Charlie"}
 
 	data, _ := json.Marshal(expected)
-	if err := c.Set(ctx, key, string(data), time.Minute); err != nil {
+	if err := c.Set(ctx, key, string(data), time.Minute).Err(); err != nil {
 		t.Fatalf("seed json cache failed: %v", err)
 	}
 

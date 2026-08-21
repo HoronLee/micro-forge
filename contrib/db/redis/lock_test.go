@@ -6,9 +6,10 @@ import (
 	"time"
 
 	redispb "github.com/Servora-Kit/servora/api/gen/go/servora/contrib/db/redis/v1"
+	goredis "github.com/redis/go-redis/v9"
 )
 
-func newTestClient(t *testing.T) *Client {
+func newTestClient(t *testing.T) *goredis.Client {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("skipping: requires Redis")
@@ -18,7 +19,7 @@ func newTestClient(t *testing.T) *Client {
 		t.Skipf("redis not available: %v", err)
 	}
 	t.Cleanup(cleanup)
-	t.Cleanup(func() { c.rdb.FlushDB(context.Background()) })
+	t.Cleanup(func() { c.FlushDB(context.Background()) })
 	return c
 }
 
@@ -26,7 +27,7 @@ func TestTryLock_Success(t *testing.T) {
 	c := newTestClient(t)
 	ctx := context.Background()
 
-	lock, err := c.TryLock(ctx, "test:lock:1", 5*time.Second)
+	lock, err := TryLock(ctx, c, "test:lock:1", 5*time.Second)
 	if err != nil {
 		t.Fatalf("expected lock acquired, got error: %v", err)
 	}
@@ -42,7 +43,7 @@ func TestTryLock_AlreadyHeld(t *testing.T) {
 	c := newTestClient(t)
 	ctx := context.Background()
 
-	lock, err := c.TryLock(ctx, "test:lock:2", 5*time.Second)
+	lock, err := TryLock(ctx, c, "test:lock:2", 5*time.Second)
 	if err != nil {
 		t.Fatalf("first lock should succeed: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestTryLock_AlreadyHeld(t *testing.T) {
 		}
 	}()
 
-	_, err = c.TryLock(ctx, "test:lock:2", 5*time.Second)
+	_, err = TryLock(ctx, c, "test:lock:2", 5*time.Second)
 	if err != ErrLockNotAcquired {
 		t.Fatalf("expected ErrLockNotAcquired, got %v", err)
 	}
@@ -62,7 +63,7 @@ func TestUnlock_SafeRelease(t *testing.T) {
 	c := newTestClient(t)
 	ctx := context.Background()
 
-	lock, _ := c.TryLock(ctx, "test:lock:3", 5*time.Second)
+	lock, _ := TryLock(ctx, c, "test:lock:3", 5*time.Second)
 	if err := lock.Unlock(ctx); err != nil {
 		t.Fatalf("unlock should succeed: %v", err)
 	}
@@ -76,9 +77,9 @@ func TestUnlock_TokenMismatch(t *testing.T) {
 	c := newTestClient(t)
 	ctx := context.Background()
 
-	lock, _ := c.TryLock(ctx, "test:lock:4", 5*time.Second)
+	lock, _ := TryLock(ctx, c, "test:lock:4", 5*time.Second)
 
-	fakeLock := &Lock{client: c, key: "test:lock:4", token: "wrong-token"}
+	fakeLock := &Lock{rdb: c, key: "test:lock:4", token: "wrong-token"}
 	if err := fakeLock.Unlock(ctx); err != ErrLockNotHeld {
 		t.Fatalf("expected ErrLockNotHeld for wrong token, got %v", err)
 	}
@@ -92,10 +93,10 @@ func TestTryLock_ExpiredThenReacquire(t *testing.T) {
 	c := newTestClient(t)
 	ctx := context.Background()
 
-	lock, _ := c.TryLock(ctx, "test:lock:5", 100*time.Millisecond)
+	lock, _ := TryLock(ctx, c, "test:lock:5", 100*time.Millisecond)
 	time.Sleep(200 * time.Millisecond)
 
-	newLock, err := c.TryLock(ctx, "test:lock:5", 5*time.Second)
+	newLock, err := TryLock(ctx, c, "test:lock:5", 5*time.Second)
 	if err != nil {
 		t.Fatalf("should reacquire expired lock: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestTryLock_CancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := c.TryLock(ctx, "test:lock:6", 5*time.Second)
+	_, err := TryLock(ctx, c, "test:lock:6", 5*time.Second)
 	if err == nil {
 		t.Fatal("expected error with cancelled context")
 	}

@@ -28,7 +28,7 @@ end
 
 // Lock 表示一个已获取的分布式锁。
 type Lock struct {
-	client *Client
+	rdb   *goredis.Client
 	key    string
 	token  string
 }
@@ -36,13 +36,13 @@ type Lock struct {
 // TryLock 尝试获取分布式锁。
 // 基于 Redis SET NX 实现，使用随机 token 标识持有者。
 // 如果锁已被占用，返回 ErrLockNotAcquired。
-func (c *Client) TryLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
+func TryLock(ctx context.Context, rdb *goredis.Client, key string, ttl time.Duration) (*Lock, error) {
 	token, err := randomToken()
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := c.rdb.SetArgs(ctx, key, token, goredis.SetArgs{Mode: "NX", TTL: ttl}).Result()
+	result, err := rdb.SetArgs(ctx, key, token, goredis.SetArgs{Mode: "NX", TTL: ttl}).Result()
 	if errors.Is(err, goredis.Nil) {
 		return nil, ErrLockNotAcquired
 	}
@@ -54,7 +54,7 @@ func (c *Client) TryLock(ctx context.Context, key string, ttl time.Duration) (*L
 	}
 
 	return &Lock{
-		client: c,
+		rdb:    rdb,
 		key:    key,
 		token:  token,
 	}, nil
@@ -64,7 +64,7 @@ func (c *Client) TryLock(ctx context.Context, key string, ttl time.Duration) (*L
 // 使用 Lua 脚本原子性地验证 token 并删除 key，防止误释放他人持有的锁。
 // 如果锁已过期或 token 不匹配，返回 ErrLockNotHeld。
 func (l *Lock) Unlock(ctx context.Context) error {
-	result, err := unlockScript.Run(ctx, l.client.rdb, []string{l.key}, l.token).Int64()
+	result, err := unlockScript.Run(ctx, l.rdb, []string{l.key}, l.token).Int64()
 	if err != nil {
 		return err
 	}
