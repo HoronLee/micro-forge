@@ -43,6 +43,30 @@ func TestBuildClientTLS_LoadsCA(t *testing.T) {
 	}
 }
 
+func TestBuildClientTLSForServerSetsServerName(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := BuildClientTLSForServer(&tlspb.TLS{Enable: true}, "redis.internal")
+	if err != nil {
+		t.Fatalf("build client tls: %v", err)
+	}
+	if cfg == nil || cfg.ServerName != "redis.internal" {
+		t.Fatalf("server name = %q, want redis.internal", cfg.ServerName)
+	}
+	if cfg.InsecureSkipVerify {
+		t.Fatal("client TLS unexpectedly disables certificate verification")
+	}
+}
+
+func TestBuildClientTLSRejectsInvalidCA(t *testing.T) {
+	t.Parallel()
+
+	_, err := BuildClientTLS(&tlspb.TLS{Enable: true, CaPath: filepath.Join(t.TempDir(), "missing.pem")})
+	if err == nil {
+		t.Fatal("BuildClientTLS() error = nil, want missing CA error")
+	}
+}
+
 func TestMustBuildServerTLS_DisabledReturnsNil(t *testing.T) {
 	cfg := MustBuildServerTLS(nil)
 	if cfg != nil {
