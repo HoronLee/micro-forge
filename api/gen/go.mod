@@ -1,6 +1,6 @@
 module github.com/Servora-Kit/servora/api/gen
 
-go 1.26.1
+go 1.26.7
 
 require (
 	github.com/go-kratos/kratos/v3 v3.0.0

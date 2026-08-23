@@ -1,6 +1,6 @@
 module github.com/Servora-Kit/servora
 
-go 1.26.1
+go 1.26.7
 
 require (
 	entgo.io/ent v0.14.5
