@@ -2,7 +2,7 @@ package registry
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"math/rand"
 	"time"
@@ -291,7 +291,7 @@ func NewEtcdDiscovery(cfg *corev1.Etcd, opts ...Option) (registry.Discovery, err
 }
 
 func marshal(si *registry.ServiceInstance) (string, error) {
-	data, err := json.Marshal(si)
+	data, err := json.Marshal(si, json.Deterministic(true), json.FormatNilMapAsNull(true), json.FormatNilSliceAsNull(true))
 	if err != nil {
 		return "", err
 	}

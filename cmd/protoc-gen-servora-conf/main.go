@@ -5,14 +5,14 @@
 //   - SectionKey() string         // present when message has (section) annotation
 //   - SectionOptional() bool      // present when section { optional: true }
 //   - ApplyDefaults()             // present when a field has (field) { default: ... },
-//                                 //   or the message transitively reaches one via a
-//                                 //   singular message-typed field (cascade container);
-//                                 //   oneof members use default-if-set (no allocation)
+//     //   or the message transitively reaches one via a
+//     //   singular message-typed field (cascade container);
+//     //   oneof members use default-if-set (no allocation)
 //   - CheckRequired() error       // present when any field has (field) { required: true },
-//                                 //   or the message transitively reaches one (cascade);
-//                                 //   oneof members are checked if set
+//     //   or the message transitively reaches one (cascade);
+//     //   oneof members are checked if set
 //   - ApplyConf() error           // composite: CheckRequired → ApplyDefaults in canonical
-//                                 //   order; runtime calls this single method via ConfApplier
+//     //   order; runtime calls this single method via ConfApplier
 //
 // Output file is co-located with the source proto's *.pb.go and shares its
 // Go package. Messages without any conf annotations are skipped so files with

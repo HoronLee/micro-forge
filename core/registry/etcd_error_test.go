@@ -88,7 +88,7 @@ func TestEtcdBoundaryConditions(t *testing.T) {
 
 		// 创建包含大量元数据的服务实例
 		largeMetadata := make(map[string]string)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			largeMetadata[fmt.Sprintf("key%d", i)] = fmt.Sprintf("value%d", i)
 		}
 
@@ -144,7 +144,7 @@ func TestEtcdBoundaryConditions(t *testing.T) {
 		const numServices = 5
 		errChan := make(chan error, numServices)
 
-		for i := 0; i < numServices; i++ {
+		for i := range numServices {
 			go func(id int) {
 				service := &registry.ServiceInstance{
 					ID:      fmt.Sprintf("concurrent-service-%d", id),
@@ -166,7 +166,7 @@ func TestEtcdBoundaryConditions(t *testing.T) {
 		}
 
 		// 等待所有操作完成
-		for i := 0; i < numServices; i++ {
+		for range numServices {
 			select {
 			case err := <-errChan:
 				if err != nil {

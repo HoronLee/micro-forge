@@ -55,8 +55,8 @@ func Generate(request *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorRe
 		index.P()
 		index.P("// @@protoc_insertion_point(typescript-http-eof)")
 		res.File = append(res.File, &pluginpb.CodeGeneratorResponse_File{
-			Name:    proto.String(path.Join(indexPathElems...)),
-			Content: proto.String(string(index.Content())),
+			Name:    new(path.Join(indexPathElems...)),
+			Content: new(string(index.Content())),
 		})
 	}
 	res.SupportedFeatures = proto.Uint64(uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL))

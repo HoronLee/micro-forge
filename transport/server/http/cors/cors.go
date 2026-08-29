@@ -71,10 +71,10 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 		if allowed == "*" || allowed == origin {
 			return true
 		}
-		if strings.HasPrefix(allowed, "*.") {
-			suffix := strings.TrimPrefix(allowed, "*.")
-			if strings.HasSuffix(origin, suffix) {
-				parts := strings.Split(strings.TrimSuffix(origin, suffix), ".")
+		if after, ok := strings.CutPrefix(allowed, "*."); ok {
+			suffix := after
+			if before, ok := strings.CutSuffix(origin, suffix); ok {
+				parts := strings.Split(before, ".")
 				if len(parts) == 2 {
 					return true
 				}

@@ -207,7 +207,7 @@ func (fields *ListFields[PO]) keysetPredicate(
 	alternatives := make([]*sql.Predicate, 0, len(terms))
 	for index, term := range terms {
 		conjunction := make([]*sql.Predicate, 0, index+1)
-		for prefix := 0; prefix < index; prefix++ {
+		for prefix := range index {
 			conjunction = append(conjunction, fields.cursorComparison(
 				selector, terms[prefix], cursor[prefix], corecrud.FilterOperatorEqual,
 			))

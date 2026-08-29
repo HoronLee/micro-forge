@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/compiler/protogen"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
@@ -84,10 +83,10 @@ func TestWalkMessageFieldsKeepsDiamondPathsAndSupportsPruning(t *testing.T) {
 func protogenMessage(t *testing.T, messages []*descriptorpb.DescriptorProto, name string) *protogen.Message {
 	t.Helper()
 	file := &descriptorpb.FileDescriptorProto{
-		Name:        proto.String("test/v1/walker.proto"),
-		Package:     proto.String("test.v1"),
-		Syntax:      proto.String("proto3"),
-		Options:     &descriptorpb.FileOptions{GoPackage: proto.String("example.com/test/v1;testv1")},
+		Name:        new("test/v1/walker.proto"),
+		Package:     new("test.v1"),
+		Syntax:      new("proto3"),
+		Options:     &descriptorpb.FileOptions{GoPackage: new("example.com/test/v1;testv1")},
 		MessageType: messages,
 	}
 	plugin, err := protogen.Options{}.New(&pluginpb.CodeGeneratorRequest{
@@ -111,13 +110,13 @@ func protoreflectName(value string) protoreflect.Name {
 }
 
 func messageDescriptor(name string, fields ...*descriptorpb.FieldDescriptorProto) *descriptorpb.DescriptorProto {
-	return &descriptorpb.DescriptorProto{Name: proto.String(name), Field: fields}
+	return &descriptorpb.DescriptorProto{Name: new(name), Field: fields}
 }
 
 func scalarField(name string, number int32) *descriptorpb.FieldDescriptorProto {
 	return &descriptorpb.FieldDescriptorProto{
-		Name:   proto.String(name),
-		Number: proto.Int32(number),
+		Name:   new(name),
+		Number: new(number),
 		Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 		Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
 	}
@@ -125,10 +124,10 @@ func scalarField(name string, number int32) *descriptorpb.FieldDescriptorProto {
 
 func messageField(name string, number int32, typeName string) *descriptorpb.FieldDescriptorProto {
 	return &descriptorpb.FieldDescriptorProto{
-		Name:     proto.String(name),
-		Number:   proto.Int32(number),
+		Name:     new(name),
+		Number:   new(number),
 		Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 		Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-		TypeName: proto.String(typeName),
+		TypeName: new(typeName),
 	}
 }

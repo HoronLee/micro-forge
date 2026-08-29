@@ -122,7 +122,7 @@ func TestGenerateRejectsInvalidCRUDContracts(t *testing.T) {
 		{
 			name: "delete wrong response",
 			mutate: func(file *descriptorpb.FileDescriptorProto) {
-				methodByName(file, "DeleteUser").OutputType = proto.String(".test.v1.Other")
+				methodByName(file, "DeleteUser").OutputType = new(".test.v1.Other")
 			},
 			want: "Delete response must be",
 		},
@@ -179,7 +179,7 @@ func TestGenerateAcceptsEmptyAndResourceDeleteResponses(t *testing.T) {
 
 	for _, output := range []string{".google.protobuf.Empty", ".test.v1.User"} {
 		file := validCRUDFile()
-		methodByName(file, "DeleteUser").OutputType = proto.String(output)
+		methodByName(file, "DeleteUser").OutputType = new(output)
 		if _, err := runGenerator(t, file, "go"); err != nil {
 			t.Fatalf("DeleteUser output %s: %v", output, err)
 		}
@@ -393,11 +393,11 @@ func makeStringMapField(request *descriptorpb.DescriptorProto, name string) {
 		field("key", 1, descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL, ""),
 		field("value", 2, descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL, ""),
 	)
-	entry.Options = &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)}
+	entry.Options = &descriptorpb.MessageOptions{MapEntry: new(true)}
 	request.NestedType = append(request.NestedType, entry)
 	mapField := fieldByName(request, name)
 	mapField.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
-	mapField.TypeName = proto.String(".test.v1." + request.GetName() + "." + entryName)
+	mapField.TypeName = new(".test.v1." + request.GetName() + "." + entryName)
 	mapField.Label = descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
 }
 
@@ -410,7 +410,7 @@ func runGeneratorFiles(t *testing.T, files []*descriptorpb.FileDescriptorProto, 
 	t.Helper()
 	request := &pluginpb.CodeGeneratorRequest{
 		ProtoFile: descriptorDependencies(),
-		Parameter: proto.String("paths=source_relative"),
+		Parameter: new("paths=source_relative"),
 	}
 	for _, file := range files {
 		request.ProtoFile = append(request.ProtoFile, file)
@@ -461,13 +461,13 @@ func descriptorDependencies() []*descriptorpb.FileDescriptorProto {
 
 func validCRUDFile() *descriptorpb.FileDescriptorProto {
 	file := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("test/v1/user.proto"),
-		Package:    proto.String("test.v1"),
-		Syntax:     proto.String("proto3"),
+		Name:       new("test/v1/user.proto"),
+		Package:    new("test.v1"),
+		Syntax:     new("proto3"),
 		Dependency: []string{"google/api/resource.proto", "google/api/field_behavior.proto", "google/protobuf/empty.proto", "google/protobuf/field_mask.proto", "google/protobuf/timestamp.proto"},
-		Options:    &descriptorpb.FileOptions{GoPackage: proto.String("example.com/test/v1;testv1")},
+		Options:    &descriptorpb.FileOptions{GoPackage: new("example.com/test/v1;testv1")},
 	}
-	user := &descriptorpb.DescriptorProto{Name: proto.String("User"), Options: &descriptorpb.MessageOptions{}}
+	user := &descriptorpb.DescriptorProto{Name: new("User"), Options: &descriptorpb.MessageOptions{}}
 	proto.SetExtension(user.Options, annotations.E_Resource, &annotations.ResourceDescriptor{
 		Type: "test.dev/User", Pattern: []string{"tenants/{tenant}/users/{user}"}, Singular: "user", Plural: "users",
 	})
@@ -512,7 +512,7 @@ func validCRUDFile() *descriptorpb.FileDescriptorProto {
 	other := message("Other")
 	file.MessageType = []*descriptorpb.DescriptorProto{user, getRequest, listRequest, listResponse, createRequest, updateRequest, deleteRequest, other}
 	file.Service = []*descriptorpb.ServiceDescriptorProto{{
-		Name: proto.String("UserService"),
+		Name: new("UserService"),
 		Method: []*descriptorpb.MethodDescriptorProto{
 			method("GetUser", ".test.v1.GetUserRequest", ".test.v1.User"),
 			method("ListUsers", ".test.v1.ListUsersRequest", ".test.v1.ListUsersResponse"),
@@ -532,27 +532,27 @@ func annotatedField(name string, number int32, fieldType descriptorpb.FieldDescr
 }
 
 func field(name string, number int32, fieldType descriptorpb.FieldDescriptorProto_Type, label descriptorpb.FieldDescriptorProto_Label, typeName string) *descriptorpb.FieldDescriptorProto {
-	result := &descriptorpb.FieldDescriptorProto{Name: proto.String(name), Number: proto.Int32(number), Type: fieldType.Enum(), Label: label.Enum()}
+	result := &descriptorpb.FieldDescriptorProto{Name: new(name), Number: new(number), Type: fieldType.Enum(), Label: label.Enum()}
 	if typeName != "" {
-		result.TypeName = proto.String(typeName)
+		result.TypeName = new(typeName)
 	}
 	return result
 }
 
 func addProto3Optional(message *descriptorpb.DescriptorProto, field *descriptorpb.FieldDescriptorProto) {
 	index := int32(len(message.OneofDecl))
-	message.OneofDecl = append(message.OneofDecl, &descriptorpb.OneofDescriptorProto{Name: proto.String("_" + field.GetName())})
-	field.Proto3Optional = proto.Bool(true)
-	field.OneofIndex = proto.Int32(index)
+	message.OneofDecl = append(message.OneofDecl, &descriptorpb.OneofDescriptorProto{Name: new("_" + field.GetName())})
+	field.Proto3Optional = new(true)
+	field.OneofIndex = new(index)
 	message.Field = append(message.Field, field)
 }
 
 func message(name string, fields ...*descriptorpb.FieldDescriptorProto) *descriptorpb.DescriptorProto {
-	return &descriptorpb.DescriptorProto{Name: proto.String(name), Field: fields}
+	return &descriptorpb.DescriptorProto{Name: new(name), Field: fields}
 }
 
 func method(name, input, output string) *descriptorpb.MethodDescriptorProto {
-	return &descriptorpb.MethodDescriptorProto{Name: proto.String(name), InputType: proto.String(input), OutputType: proto.String(output)}
+	return &descriptorpb.MethodDescriptorProto{Name: new(name), InputType: new(input), OutputType: new(output)}
 }
 
 func messageByName(file *descriptorpb.FileDescriptorProto, name string) *descriptorpb.DescriptorProto {
@@ -594,7 +594,7 @@ func removeProto3OptionalPresence(message *descriptorpb.DescriptorProto, name st
 	message.OneofDecl = append(message.OneofDecl[:index], message.OneofDecl[index+1:]...)
 	for _, candidate := range message.Field {
 		if candidate.OneofIndex != nil && candidate.GetOneofIndex() > index {
-			candidate.OneofIndex = proto.Int32(candidate.GetOneofIndex() - 1)
+			candidate.OneofIndex = new(candidate.GetOneofIndex() - 1)
 		}
 	}
 }
@@ -707,8 +707,8 @@ func TestGenerateResponseOrderIsDeterministic(t *testing.T) {
 	first := validCRUDFile()
 	second := proto.Clone(first).(*descriptorpb.FileDescriptorProto)
 	rewriteProtoPackage(second, "test.v1", "other.v1")
-	second.Name = proto.String("other/v1/user.proto")
-	second.Options.GoPackage = proto.String("example.com/other/v1;otherv1")
+	second.Name = new("other/v1/user.proto")
+	second.Options.GoPackage = new("example.com/other/v1;otherv1")
 
 	var baseline *pluginpb.CodeGeneratorResponse
 	for iteration := range 20 {
@@ -728,14 +728,14 @@ func TestGenerateResponseOrderIsDeterministic(t *testing.T) {
 }
 
 func rewriteProtoPackage(file *descriptorpb.FileDescriptorProto, oldPackage, newPackage string) {
-	file.Package = proto.String(newPackage)
+	file.Package = new(newPackage)
 	oldPrefix := "." + oldPackage + "."
 	newPrefix := "." + newPackage + "."
 	var rewriteMessage func(*descriptorpb.DescriptorProto)
 	rewriteMessage = func(message *descriptorpb.DescriptorProto) {
 		for _, field := range message.Field {
-			if strings.HasPrefix(field.GetTypeName(), oldPrefix) {
-				field.TypeName = proto.String(newPrefix + strings.TrimPrefix(field.GetTypeName(), oldPrefix))
+			if after, ok := strings.CutPrefix(field.GetTypeName(), oldPrefix); ok {
+				field.TypeName = new(newPrefix + after)
 			}
 		}
 		for _, nested := range message.NestedType {
@@ -747,11 +747,11 @@ func rewriteProtoPackage(file *descriptorpb.FileDescriptorProto, oldPackage, new
 	}
 	for _, service := range file.Service {
 		for _, method := range service.Method {
-			if strings.HasPrefix(method.GetInputType(), oldPrefix) {
-				method.InputType = proto.String(newPrefix + strings.TrimPrefix(method.GetInputType(), oldPrefix))
+			if after, ok := strings.CutPrefix(method.GetInputType(), oldPrefix); ok {
+				method.InputType = new(newPrefix + after)
 			}
-			if strings.HasPrefix(method.GetOutputType(), oldPrefix) {
-				method.OutputType = proto.String(newPrefix + strings.TrimPrefix(method.GetOutputType(), oldPrefix))
+			if after, ok := strings.CutPrefix(method.GetOutputType(), oldPrefix); ok {
+				method.OutputType = new(newPrefix + after)
 			}
 		}
 	}

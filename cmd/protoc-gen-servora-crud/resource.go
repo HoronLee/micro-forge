@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -261,12 +262,7 @@ func collectResourceFields(message *protogen.Message) ([]resourceField, error) {
 
 func hasBehavior(field protoreflect.FieldDescriptor, wanted annotations.FieldBehavior) bool {
 	behaviors, _ := proto.GetExtension(field.Options(), annotations.E_FieldBehavior).([]annotations.FieldBehavior)
-	for _, behavior := range behaviors {
-		if behavior == wanted {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(behaviors, wanted)
 }
 
 func isWritableResourceField(field protoreflect.FieldDescriptor) bool {

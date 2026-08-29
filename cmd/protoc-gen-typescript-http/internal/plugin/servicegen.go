@@ -3,6 +3,7 @@ package plugin
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Servora-Kit/servora/cmd/protoc-gen-typescript-http/internal/codegen"
@@ -187,12 +188,7 @@ func hasFieldBehavior(field protoreflect.FieldDescriptor, wanted annotations.Fie
 	if !ok {
 		return false
 	}
-	for _, behavior := range behaviors {
-		if behavior == wanted {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(behaviors, wanted)
 }
 
 func fieldAtPath(message protoreflect.MessageDescriptor, path httprule.FieldPath) protoreflect.FieldDescriptor {

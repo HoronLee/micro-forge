@@ -1,6 +1,6 @@
 module github.com/Servora-Kit/servora/api/gen
 
-go 1.26.7
+go 1.27.0
 
 require (
 	github.com/go-kratos/kratos/v3 v3.0.0
@@ -15,7 +15,8 @@ require (
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260511170946-3700d4141b60 // indirect

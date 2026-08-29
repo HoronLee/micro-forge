@@ -15,7 +15,7 @@ var (
 
 // Warn logs a warning message to stderr. It is safe for concurrent use.
 // Warnings are prefixed with the plugin name so users can identify the source.
-func Warn(format string, args ...interface{}) {
+func Warn(format string, args ...any) {
 	logMu.Lock()
 	defer logMu.Unlock()
 	prefix := fmt.Sprintf("[%s] WARN:", filepath.Base(os.Args[0]))

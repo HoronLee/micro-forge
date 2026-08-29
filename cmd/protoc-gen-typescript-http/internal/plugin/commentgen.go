@@ -15,8 +15,8 @@ type commentGenerator struct {
 
 func (c commentGenerator) generateLeading(f *codegen.File, indent int) {
 	loc := c.descriptor.ParentFile().SourceLocations().ByDescriptor(c.descriptor)
-	lines := strings.Split(loc.LeadingComments, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(loc.LeadingComments, "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}

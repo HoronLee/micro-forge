@@ -169,6 +169,31 @@ func TestEtcdConversion(t *testing.T) {
 	t.Logf("Configuration conversion test passed")
 }
 
+func TestEtcdJSONReadsLegacyServiceInstance(t *testing.T) {
+	legacy := []byte(`{"id":"legacy-service","name":"legacy","version":"v1","metadata":{"region":"local"},"endpoints":["grpc://127.0.0.1:9001"]}`)
+	service, err := unmarshal(legacy)
+	if err != nil {
+		t.Fatalf("unmarshal legacy service instance: %v", err)
+	}
+	if service.ID != "legacy-service" || service.Name != "legacy" || service.Version != "v1" {
+		t.Fatalf("service identity = %#v", service)
+	}
+	if service.Metadata["region"] != "local" || len(service.Endpoints) != 1 {
+		t.Fatalf("service data = %#v", service)
+	}
+	encoded, err := marshal(service)
+	if err != nil {
+		t.Fatalf("marshal service instance: %v", err)
+	}
+	decoded, err := unmarshal([]byte(encoded))
+	if err != nil {
+		t.Fatalf("unmarshal migrated service instance: %v", err)
+	}
+	if decoded.ID != service.ID || decoded.Metadata["region"] != service.Metadata["region"] {
+		t.Fatalf("round-trip service = %#v", decoded)
+	}
+}
+
 // BenchmarkEtcdServiceDiscovery 性能基准测试
 func BenchmarkEtcdServiceDiscovery(b *testing.B) {
 	if testing.Short() {

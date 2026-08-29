@@ -13,9 +13,8 @@
 package health
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"net/http"
 	"time"
 )
@@ -103,15 +102,16 @@ func (h *Handler) ReadinessHandler() http.HandlerFunc {
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(payload); err != nil {
+	data, err := json.Marshal(payload)
+	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	data = append(data, '\n')
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, _ = w.Write(buf.Bytes())
+	_, _ = w.Write(data)
 }
 
 // pingChecker 通过 Pinger 接口实现 Checker。

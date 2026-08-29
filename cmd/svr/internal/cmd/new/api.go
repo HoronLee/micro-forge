@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -51,13 +52,7 @@ Must be run from the project root directory.`,
 				return fmt.Errorf("failed to discover services: %w", err)
 			}
 
-			found := false
-			for _, svc := range services {
-				if svc == serverName {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(services, serverName)
 
 			if !found {
 				fmt.Fprintf(os.Stderr, "error: service %q not found\n", serverName)
@@ -204,8 +199,8 @@ func toSnake(name string) string {
 // "say_hello" → "SayHello", "test.test1" → "TestTest1".
 func toPascal(name string) string {
 	var b strings.Builder
-	for _, seg := range strings.Split(name, ".") {
-		for _, word := range strings.Split(seg, "_") {
+	for seg := range strings.SplitSeq(name, ".") {
+		for word := range strings.SplitSeq(seg, "_") {
 			if len(word) == 0 {
 				continue
 			}

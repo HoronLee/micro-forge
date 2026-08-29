@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"sync"
 
 	corev1 "github.com/Servora-Kit/servora/api/gen/go/servora/core/v1"
@@ -152,8 +153,8 @@ func (r *Runtime) Close(ctx context.Context) error {
 	}
 	r.closeOnce.Do(func() {
 		var joined error
-		for i := len(r.cleanups) - 1; i >= 0; i-- {
-			joined = errors.Join(joined, runCleanup(ctx, r.cleanups[i]))
+		for i, v := range slices.Backward(r.cleanups) {
+			joined = errors.Join(joined, runCleanup(ctx, v))
 			if i > 0 {
 				if err := ctx.Err(); err != nil {
 					joined = errors.Join(joined, err)

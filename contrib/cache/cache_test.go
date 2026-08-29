@@ -42,6 +42,22 @@ func TestKeyspaceInvalidationChangesKeys(t *testing.T) {
 	require.Equal(t, StableKey([]string{"b", "a"}), StableKey([]string{"a", "b"}))
 }
 
+func TestStableKeyDeterministicAcrossMapOrderAndNilValues(t *testing.T) {
+	first := map[string]string{"b": "2", "a": "1"}
+	second := map[string]string{"a": "1", "b": "2"}
+	if got, want := StableKey(first), StableKey(second); got != want {
+		t.Fatalf("StableKey differs for equivalent maps: %q != %q", got, want)
+	}
+	var nilMap map[string]string
+	if got := stableEncode(nilMap); got != "null" {
+		t.Fatalf("nil map encoding = %q, want null", got)
+	}
+	var nilSlice []string
+	if got := stableEncode(nilSlice); got != "null" {
+		t.Fatalf("nil slice encoding = %q, want null", got)
+	}
+}
+
 func TestSupportSingleflightAndHooks(t *testing.T) {
 	ctx := context.Background()
 	var misses atomic.Int64
@@ -58,9 +74,7 @@ func TestSupportSingleflightAndHooks(t *testing.T) {
 	var loads atomic.Int64
 	var wg sync.WaitGroup
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			got, err := support.GetOrLoad(ctx, "job:1", 0, func(context.Context) ([]byte, error) {
 				loads.Add(1)
 				time.Sleep(10 * time.Millisecond)
@@ -68,7 +82,7 @@ func TestSupportSingleflightAndHooks(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, []byte("cached"), got)
-		}()
+		})
 	}
 	wg.Wait()
 

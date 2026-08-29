@@ -71,17 +71,17 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 	t.Helper()
 
 	fp := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String(fs.name),
-		Package:    proto.String(fs.pkg),
-		Syntax:     proto.String(protoreflect.Proto3.String()),
+		Name:       new(fs.name),
+		Package:    new(fs.pkg),
+		Syntax:     new(protoreflect.Proto3.String()),
 		Dependency: []string{"google/protobuf/descriptor.proto", "servora/audit/v1/annotations.proto"},
 		Options: &descriptorpb.FileOptions{
-			GoPackage: proto.String(fs.goPkg),
+			GoPackage: new(fs.goPkg),
 		},
 	}
 
 	for _, svc := range fs.services {
-		sp := &descriptorpb.ServiceDescriptorProto{Name: proto.String(svc.name)}
+		sp := &descriptorpb.ServiceDescriptorProto{Name: new(svc.name)}
 		if svc.serviceDefault != nil {
 			opts := &descriptorpb.ServiceOptions{}
 			proto.SetExtension(opts, auditv1.E_ServiceDefault, svc.serviceDefault)
@@ -89,9 +89,9 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 		}
 		for _, m := range svc.methods {
 			mp := &descriptorpb.MethodDescriptorProto{
-				Name:       proto.String(m.name),
-				InputType:  proto.String("." + fs.pkg + ".Empty"),
-				OutputType: proto.String("." + fs.pkg + ".Empty"),
+				Name:       new(m.name),
+				InputType:  new("." + fs.pkg + ".Empty"),
+				OutputType: new("." + fs.pkg + ".Empty"),
 			}
 			if m.rule != nil {
 				opts := &descriptorpb.MethodOptions{}
@@ -103,7 +103,7 @@ func buildFileDescriptorProto(t *testing.T, fs fileSpec) *descriptorpb.FileDescr
 		fp.Service = append(fp.Service, sp)
 	}
 
-	emptyMsg := &descriptorpb.DescriptorProto{Name: proto.String("Empty")}
+	emptyMsg := &descriptorpb.DescriptorProto{Name: new("Empty")}
 	fp.MessageType = append(fp.MessageType, emptyMsg)
 
 	return fp

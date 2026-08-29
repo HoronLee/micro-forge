@@ -5,7 +5,6 @@ import (
 
 	examplev1 "github.com/Servora-Kit/servora/api/gen/go/servora/example/v1"
 	"github.com/Servora-Kit/servora/core/crud"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestListResultPreservesOptionalZeroTotal(t *testing.T) {
@@ -41,17 +40,17 @@ func TestListResultOmitsUnrequestedTotal(t *testing.T) {
 func TestListResultClonesProtobufItems(t *testing.T) {
 	t.Parallel()
 
-	input := &examplev1.User{DisplayName: proto.String("original")}
+	input := &examplev1.User{DisplayName: new("original")}
 	result, err := crud.NewListResult(preparedListQuery(t, false), []*examplev1.User{input}, "", nil)
 	if err != nil {
 		t.Fatalf("NewListResult: %v", err)
 	}
-	input.DisplayName = proto.String("input changed")
+	input.DisplayName = new("input changed")
 	first := result.Items()
 	if got := first[0].GetDisplayName(); got != "original" {
 		t.Fatalf("stored item = %q, want original", got)
 	}
-	first[0].DisplayName = proto.String("output changed")
+	first[0].DisplayName = new("output changed")
 	if got := result.Items()[0].GetDisplayName(); got != "original" {
 		t.Fatalf("Items() aliases stored item: %q", got)
 	}

@@ -21,20 +21,20 @@ func TestGenerateErrors(t *testing.T) {
 	proto.SetExtension(invalidOptions, errorsv1.E_Code, int32(400))
 
 	target := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("example/v1/errors.proto"),
-		Package:    proto.String("example.v1"),
+		Name:       new("example/v1/errors.proto"),
+		Package:    new("example.v1"),
 		Dependency: []string{"servora/errors/v1/errors.proto"},
 		Options: &descriptorpb.FileOptions{
-			GoPackage: proto.String("example.com/gen/example/v1;examplev1"),
+			GoPackage: new("example.com/gen/example/v1;examplev1"),
 		},
 		EnumType: []*descriptorpb.EnumDescriptorProto{
 			{
-				Name:    proto.String("ErrorReason"),
+				Name:    new("ErrorReason"),
 				Options: enumOptions,
 				Value: []*descriptorpb.EnumValueDescriptorProto{
-					{Name: proto.String("ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
-					{Name: proto.String("ERROR_REASON_INVALID_INPUT"), Number: proto.Int32(1), Options: invalidOptions},
-					{Name: proto.String("ERROR_REASON_INTERNAL"), Number: proto.Int32(2)},
+					{Name: new("ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
+					{Name: new("ERROR_REASON_INVALID_INPUT"), Number: proto.Int32(1), Options: invalidOptions},
+					{Name: new("ERROR_REASON_INTERNAL"), Number: proto.Int32(2)},
 				},
 			},
 		},
@@ -59,16 +59,16 @@ func TestGenerateSkipsUnannotatedEnums(t *testing.T) {
 	t.Parallel()
 
 	target := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("example/v1/plain.proto"),
-		Package: proto.String("example.v1"),
+		Name:    new("example/v1/plain.proto"),
+		Package: new("example.v1"),
 		Options: &descriptorpb.FileOptions{
-			GoPackage: proto.String("example.com/gen/example/v1;examplev1"),
+			GoPackage: new("example.com/gen/example/v1;examplev1"),
 		},
 		EnumType: []*descriptorpb.EnumDescriptorProto{
 			{
-				Name: proto.String("Plain"),
+				Name: new("Plain"),
 				Value: []*descriptorpb.EnumValueDescriptorProto{
-					{Name: proto.String("PLAIN_UNSPECIFIED"), Number: proto.Int32(0)},
+					{Name: new("PLAIN_UNSPECIFIED"), Number: proto.Int32(0)},
 				},
 			},
 		},
@@ -84,7 +84,7 @@ func runGenerator(t *testing.T, target *descriptorpb.FileDescriptorProto) map[st
 
 	request := &pluginpb.CodeGeneratorRequest{
 		FileToGenerate: []string{target.GetName()},
-		Parameter:      proto.String("paths=source_relative"),
+		Parameter:      new("paths=source_relative"),
 		ProtoFile: []*descriptorpb.FileDescriptorProto{
 			protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto),
 			protodesc.ToFileDescriptorProto(errorsv1.File_servora_errors_v1_errors_proto),

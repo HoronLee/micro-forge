@@ -327,9 +327,8 @@ func resourceIdentifier(descriptor protoreflect.MessageDescriptor) (protoreflect
 }
 
 func protoGoField(dtoType reflect.Type, name protoreflect.Name) (reflect.StructField, bool) {
-	for index := 0; index < dtoType.NumField(); index++ {
-		field := dtoType.Field(index)
-		for _, part := range strings.Split(field.Tag.Get("protobuf"), ",") {
+	for field := range dtoType.Fields() {
+		for part := range strings.SplitSeq(field.Tag.Get("protobuf"), ",") {
 			if strings.TrimPrefix(part, "name=") == string(name) && strings.HasPrefix(part, "name=") {
 				return field, true
 			}

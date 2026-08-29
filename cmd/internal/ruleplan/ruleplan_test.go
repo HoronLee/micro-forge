@@ -232,7 +232,7 @@ func newTestPlugin(t *testing.T, files []testFile) *protogen.Plugin {
 	t.Helper()
 	req := &pluginpb.CodeGeneratorRequest{
 		ProtoFile: descriptorClosure(auditv1.File_servora_audit_v1_annotations_proto),
-		Parameter: proto.String("paths=source_relative"),
+		Parameter: new("paths=source_relative"),
 	}
 	for _, file := range files {
 		req.ProtoFile = append(req.ProtoFile, testFileDescriptor(file))
@@ -253,15 +253,15 @@ func testFileDescriptor(file testFile) *descriptorpb.FileDescriptorProto {
 		messageName = file.services[0].name + "Request"
 	}
 	descriptor := &descriptorpb.FileDescriptorProto{
-		Name:        proto.String(file.name),
-		Package:     proto.String(file.pkg),
-		Syntax:      proto.String("proto3"),
+		Name:        new(file.name),
+		Package:     new(file.pkg),
+		Syntax:      new("proto3"),
 		Dependency:  []string{"google/protobuf/descriptor.proto", "servora/audit/v1/annotations.proto"},
-		Options:     &descriptorpb.FileOptions{GoPackage: proto.String(file.goPkg)},
-		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String(messageName)}},
+		Options:     &descriptorpb.FileOptions{GoPackage: new(file.goPkg)},
+		MessageType: []*descriptorpb.DescriptorProto{{Name: new(messageName)}},
 	}
 	for _, service := range file.services {
-		serviceDescriptor := &descriptorpb.ServiceDescriptorProto{Name: proto.String(service.name)}
+		serviceDescriptor := &descriptorpb.ServiceDescriptorProto{Name: new(service.name)}
 		if service.serviceDefault != nil {
 			options := &descriptorpb.ServiceOptions{}
 			proto.SetExtension(options, auditv1.E_ServiceDefault, service.serviceDefault)
@@ -269,9 +269,9 @@ func testFileDescriptor(file testFile) *descriptorpb.FileDescriptorProto {
 		}
 		for _, method := range service.methods {
 			methodDescriptor := &descriptorpb.MethodDescriptorProto{
-				Name:       proto.String(method.name),
-				InputType:  proto.String("." + file.pkg + "." + messageName),
-				OutputType: proto.String("." + file.pkg + "." + messageName),
+				Name:       new(method.name),
+				InputType:  new("." + file.pkg + "." + messageName),
+				OutputType: new("." + file.pkg + "." + messageName),
 			}
 			if method.rule != nil {
 				options := &descriptorpb.MethodOptions{}

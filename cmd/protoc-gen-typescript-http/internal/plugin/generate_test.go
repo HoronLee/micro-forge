@@ -92,14 +92,14 @@ func generateContractFixture(t *testing.T) string {
 
 func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 	payload := &descriptorpb.DescriptorProto{
-		Name: proto.String("Payload"),
+		Name: new("Payload"),
 		OneofDecl: []*descriptorpb.OneofDescriptorProto{
-			{Name: proto.String("_optional_int64")},
+			{Name: new("_optional_int64")},
 		},
 		NestedType: []*descriptorpb.DescriptorProto{
 			{
-				Name:    proto.String("Uint64ByKeyEntry"),
-				Options: &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)},
+				Name:    new("Uint64ByKeyEntry"),
+				Options: &descriptorpb.MessageOptions{MapEntry: new(true)},
 				Field: []*descriptorpb.FieldDescriptorProto{
 					scalarField("key", 1, descriptorpb.FieldDescriptorProto_TYPE_STRING),
 					scalarField("value", 2, descriptorpb.FieldDescriptorProto_TYPE_UINT64),
@@ -117,25 +117,25 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 			scalarField("fixed64_value", 8, descriptorpb.FieldDescriptorProto_TYPE_FIXED64),
 			scalarField("sfixed64_value", 9, descriptorpb.FieldDescriptorProto_TYPE_SFIXED64),
 			{
-				Name:           proto.String("optional_int64"),
+				Name:           new("optional_int64"),
 				Number:         proto.Int32(10),
 				Label:          descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 				Type:           descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(),
 				OneofIndex:     proto.Int32(0),
-				Proto3Optional: proto.Bool(true),
+				Proto3Optional: new(true),
 			},
 			{
-				Name:   proto.String("repeated_int64"),
+				Name:   new("repeated_int64"),
 				Number: proto.Int32(11),
 				Label:  descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
 				Type:   descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(),
 			},
 			{
-				Name:     proto.String("uint64_by_key"),
+				Name:     new("uint64_by_key"),
 				Number:   proto.Int32(12),
 				Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
 				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-				TypeName: proto.String(".test.v1.Payload.Uint64ByKeyEntry"),
+				TypeName: new(".test.v1.Payload.Uint64ByKeyEntry"),
 			},
 			messageField("int64_wrapper", 13, ".google.protobuf.Int64Value"),
 			messageField("uint64_wrapper", 14, ".google.protobuf.UInt64Value"),
@@ -145,7 +145,7 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 	}
 
 	request := &descriptorpb.DescriptorProto{
-		Name: proto.String("GetRequest"),
+		Name: new("GetRequest"),
 		Field: []*descriptorpb.FieldDescriptorProto{
 			scalarField("name", 1, descriptorpb.FieldDescriptorProto_TYPE_STRING),
 			scalarField("id", 2, descriptorpb.FieldDescriptorProto_TYPE_STRING),
@@ -154,16 +154,16 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 		},
 	}
 	createRequest := &descriptorpb.DescriptorProto{
-		Name: proto.String("CreateRequest"),
+		Name: new("CreateRequest"),
 		Field: []*descriptorpb.FieldDescriptorProto{
 			requiredField(messageField("payload", 1, ".test.v1.Payload")),
 		},
 	}
 
 	return &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("test/v1/contract.proto"),
-		Package:    proto.String("test.v1"),
-		Syntax:     proto.String("proto3"),
+		Name:       new("test/v1/contract.proto"),
+		Package:    new("test.v1"),
+		Syntax:     new("proto3"),
 		Dependency: []string{"google/api/annotations.proto", "google/api/field_behavior.proto", "google/protobuf/wrappers.proto"},
 		MessageType: []*descriptorpb.DescriptorProto{
 			request,
@@ -172,7 +172,7 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 		},
 		Service: []*descriptorpb.ServiceDescriptorProto{
 			{
-				Name: proto.String("ContractService"),
+				Name: new("ContractService"),
 				Method: []*descriptorpb.MethodDescriptorProto{
 					httpMethod("GetNested", "/v1/{name=tenants/*/users/*}"),
 					httpMethod("GetSingle", "/v1/users/{id}"),
@@ -189,8 +189,8 @@ func scalarField(
 	fieldType descriptorpb.FieldDescriptorProto_Type,
 ) *descriptorpb.FieldDescriptorProto {
 	return &descriptorpb.FieldDescriptorProto{
-		Name:   proto.String(name),
-		Number: proto.Int32(number),
+		Name:   new(name),
+		Number: new(number),
 		Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 		Type:   fieldType.Enum(),
 	}
@@ -198,7 +198,7 @@ func scalarField(
 
 func messageField(name string, number int32, typeName string) *descriptorpb.FieldDescriptorProto {
 	field := scalarField(name, number, descriptorpb.FieldDescriptorProto_TYPE_MESSAGE)
-	field.TypeName = proto.String(typeName)
+	field.TypeName = new(typeName)
 	return field
 }
 
@@ -208,9 +208,9 @@ func httpMethod(name string, path string) *descriptorpb.MethodDescriptorProto {
 		Pattern: &annotations.HttpRule_Get{Get: path},
 	})
 	return &descriptorpb.MethodDescriptorProto{
-		Name:       proto.String(name),
-		InputType:  proto.String(".test.v1.GetRequest"),
-		OutputType: proto.String(".test.v1.Payload"),
+		Name:       new(name),
+		InputType:  new(".test.v1.GetRequest"),
+		OutputType: new(".test.v1.Payload"),
 		Options:    options,
 	}
 }
@@ -228,9 +228,9 @@ func httpPostMethod(name, path, body, input string) *descriptorpb.MethodDescript
 		Body:    body,
 	})
 	return &descriptorpb.MethodDescriptorProto{
-		Name:       proto.String(name),
-		InputType:  proto.String(input),
-		OutputType: proto.String(".test.v1.Payload"),
+		Name:       new(name),
+		InputType:  new(input),
+		OutputType: new(".test.v1.Payload"),
 		Options:    options,
 	}
 }

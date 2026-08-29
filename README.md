@@ -24,7 +24,7 @@
 
 ## 快速开始🏃‍♂️
 
-跑一对 master + worker 微服务，看看 servora 起一个项目长什么样。前置要求：Go 1.26.1+、Docker。
+跑一对 master + worker 微服务，看看 servora 起一个项目长什么样。前置要求：Go 1.27.0+、Docker。
 
 ```bash
 git clone https://github.com/Servora-Kit/servora-example

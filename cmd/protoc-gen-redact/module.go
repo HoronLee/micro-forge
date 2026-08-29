@@ -44,7 +44,7 @@ func (m *Module) InitContext(c pgs.BuildContext) {
 	// Check for custom template file parameter
 	templateFile := c.Parameters().Str("template_file")
 
-	tpl := template.New("redact").Funcs(map[string]interface{}{
+	tpl := template.New("redact").Funcs(map[string]any{
 		"package": m.ctx.PackageName,
 		"name":    m.ctx.Name,
 	})

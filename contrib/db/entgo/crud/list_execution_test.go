@@ -387,10 +387,7 @@ func (query *fakeListQuery) All(context.Context) ([]*fakeEntity, error) {
 	if query.allErr != nil {
 		return nil, query.allErr
 	}
-	start := query.offset
-	if start > len(query.rows) {
-		start = len(query.rows)
-	}
+	start := min(query.offset, len(query.rows))
 	end := len(query.rows)
 	if query.limit > 0 && start+query.limit < end {
 		end = start + query.limit

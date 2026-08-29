@@ -7,7 +7,6 @@ import (
 	crudpb "github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1"
 	examplev1 "github.com/Servora-Kit/servora/api/gen/go/servora/example/v1"
 	"github.com/Servora-Kit/servora/core/crud"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -21,8 +20,8 @@ func TestPrepareCreateValidatesRequiredAndClearsSystemFields(t *testing.T) {
 	}
 	prepared, err := plan.PrepareCreate(&examplev1.User{
 		Name:              "tenants/acme/users/u-1",
-		Email:             proto.String("alice@example.com"),
-		TemporaryPassword: proto.String("secret"),
+		Email:             new("alice@example.com"),
+		TemporaryPassword: new("secret"),
 		CreateTime:        timestamppb.Now(),
 	})
 	if err != nil {
@@ -65,7 +64,7 @@ func TestPreparedUpdateValidatesImmutableDirectIntent(t *testing.T) {
 
 	plan := userResourcePlan()
 	prepared, err := plan.PrepareUpdate(
-		&examplev1.User{TenantPlan: proto.String("enterprise")},
+		&examplev1.User{TenantPlan: new("enterprise")},
 		&fieldmaskpb.FieldMask{Paths: []string{"tenant_plan"}},
 		crud.UpdateOptions{},
 	)
@@ -75,10 +74,10 @@ func TestPreparedUpdateValidatesImmutableDirectIntent(t *testing.T) {
 	if got, want := len(prepared.ImmutableComparisons()), 1; got != want {
 		t.Fatalf("immutable comparisons = %d, want %d", got, want)
 	}
-	if err := prepared.ValidateImmutable(&examplev1.User{TenantPlan: proto.String("enterprise")}); err != nil {
+	if err := prepared.ValidateImmutable(&examplev1.User{TenantPlan: new("enterprise")}); err != nil {
 		t.Fatalf("ValidateImmutable same value: %v", err)
 	}
-	if err := prepared.ValidateImmutable(&examplev1.User{TenantPlan: proto.String("basic")}); !crudpb.IsCrudErrorReasonInvalidFieldValue(err) {
+	if err := prepared.ValidateImmutable(&examplev1.User{TenantPlan: new("basic")}); !crudpb.IsCrudErrorReasonInvalidFieldValue(err) {
 		t.Fatalf("ValidateImmutable changed value error = %v, want INVALID_FIELD_VALUE", err)
 	}
 	if slices.Contains(prepared.WriteMask().GetPaths(), "tenant_plan") {
@@ -90,7 +89,7 @@ func TestPrepareUpdateImplicitMaskIgnoresDefaultPlainScalar(t *testing.T) {
 	t.Parallel()
 
 	plan := userResourcePlan()
-	prepared, err := plan.PrepareUpdate(&examplev1.User{Email: proto.String("alice@example.com")}, nil, crud.UpdateOptions{})
+	prepared, err := plan.PrepareUpdate(&examplev1.User{Email: new("alice@example.com")}, nil, crud.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("PrepareUpdate: %v", err)
 	}
@@ -105,7 +104,7 @@ func TestToResponseValidatesNameClonesAndClearsInputOnly(t *testing.T) {
 	plan := userResourcePlan()
 	input := &examplev1.User{
 		Name:              "tenants/acme/users/u-1",
-		TemporaryPassword: proto.String("secret"),
+		TemporaryPassword: new("secret"),
 	}
 	output, err := plan.ToResponse(input)
 	if err != nil {

@@ -246,7 +246,7 @@ func (m *Module) redactedCustomValue(
 
 // RuleInfo response type for Module.RuleInformation
 type RuleInfo struct {
-	RedactionValue interface{}
+	RedactionValue any
 	// equivalent field type information
 	ProtoType  pgs.ProtoType
 	ProtoLabel pgs.ProtoLabel

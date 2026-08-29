@@ -37,7 +37,6 @@ func TestGenerateRejectsUnknownOrEmptyTargetWithoutPartialOutput(t *testing.T) {
 	t.Parallel()
 
 	for _, target := range []string{"", "javascript"} {
-		target := target
 		t.Run(fmt.Sprintf("target=%q", target), func(t *testing.T) {
 			t.Parallel()
 
@@ -63,7 +62,6 @@ func TestGenerateRejectsOutOfRangeCodeForEveryTarget(t *testing.T) {
 	t.Parallel()
 
 	for _, target := range []string{generatorTargetGo, generatorTargetTypeScript} {
-		target := target
 		t.Run(target, func(t *testing.T) {
 			t.Parallel()
 
@@ -89,7 +87,6 @@ func TestGenerateSkipsUnannotatedAndNestedEnumsForEveryTarget(t *testing.T) {
 	t.Parallel()
 
 	for _, target := range []string{generatorTargetGo, generatorTargetTypeScript} {
-		target := target
 		t.Run(target, func(t *testing.T) {
 			t.Parallel()
 
@@ -181,7 +178,7 @@ func generateWithParameter(
 	options, selectedTarget := newGeneratorOptions()
 	request := &pluginpb.CodeGeneratorRequest{
 		FileToGenerate: []string{target.GetName()},
-		Parameter:      proto.String(parameter),
+		Parameter:      new(parameter),
 		ProtoFile: []*descriptorpb.FileDescriptorProto{
 			protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto),
 			protodesc.ToFileDescriptorProto(errorsv1.File_servora_errors_v1_errors_proto),
@@ -209,34 +206,34 @@ func typeScriptFixture() *descriptorpb.FileDescriptorProto {
 	proto.SetExtension(declinedOptions, errorsv1.E_Code, int32(402))
 
 	return &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("example/service/v1/user.proto"),
-		Package:    proto.String("example.service.v1"),
+		Name:       new("example/service/v1/user.proto"),
+		Package:    new("example.service.v1"),
 		Dependency: []string{"servora/errors/v1/errors.proto"},
 		Options: &descriptorpb.FileOptions{
-			GoPackage: proto.String("example.com/gen/example/service/v1;servicev1"),
+			GoPackage: new("example.com/gen/example/service/v1;servicev1"),
 		},
 		EnumType: []*descriptorpb.EnumDescriptorProto{
 			{
-				Name:    proto.String("UserErrorReason"),
+				Name:    new("UserErrorReason"),
 				Options: defaultOptions,
 				Value: []*descriptorpb.EnumValueDescriptorProto{
-					{Name: proto.String("USER_ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
-					{Name: proto.String("USER_ERROR_REASON_INVALID_NAME"), Number: proto.Int32(1), Options: invalidNameOptions},
-					{Name: proto.String("USER_ERROR_REASON_INTERNAL"), Number: proto.Int32(2)},
+					{Name: new("USER_ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
+					{Name: new("USER_ERROR_REASON_INVALID_NAME"), Number: proto.Int32(1), Options: invalidNameOptions},
+					{Name: new("USER_ERROR_REASON_INTERNAL"), Number: proto.Int32(2)},
 				},
 			},
 			{
-				Name: proto.String("Role"),
+				Name: new("Role"),
 				Value: []*descriptorpb.EnumValueDescriptorProto{
-					{Name: proto.String("ROLE_UNSPECIFIED"), Number: proto.Int32(0)},
-					{Name: proto.String("ROLE_ADMIN"), Number: proto.Int32(1)},
+					{Name: new("ROLE_UNSPECIFIED"), Number: proto.Int32(0)},
+					{Name: new("ROLE_ADMIN"), Number: proto.Int32(1)},
 				},
 			},
 			{
-				Name: proto.String("PaymentErrorReason"),
+				Name: new("PaymentErrorReason"),
 				Value: []*descriptorpb.EnumValueDescriptorProto{
-					{Name: proto.String("PAYMENT_ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
-					{Name: proto.String("PAYMENT_ERROR_REASON_DECLINED"), Number: proto.Int32(1), Options: declinedOptions},
+					{Name: new("PAYMENT_ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
+					{Name: new("PAYMENT_ERROR_REASON_DECLINED"), Number: proto.Int32(1), Options: declinedOptions},
 				},
 			},
 		},
@@ -247,29 +244,29 @@ func nonTopLevelErrorFixture() *descriptorpb.FileDescriptorProto {
 	proto.SetExtension(defaultOptions, errorsv1.E_DefaultCode, int32(500))
 
 	return &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("example/service/v1/plain.proto"),
-		Package:    proto.String("example.service.v1"),
+		Name:       new("example/service/v1/plain.proto"),
+		Package:    new("example.service.v1"),
 		Dependency: []string{"servora/errors/v1/errors.proto"},
 		Options: &descriptorpb.FileOptions{
-			GoPackage: proto.String("example.com/gen/example/service/v1;servicev1"),
+			GoPackage: new("example.com/gen/example/service/v1;servicev1"),
 		},
 		EnumType: []*descriptorpb.EnumDescriptorProto{
 			{
-				Name: proto.String("Plain"),
+				Name: new("Plain"),
 				Value: []*descriptorpb.EnumValueDescriptorProto{
-					{Name: proto.String("PLAIN_UNSPECIFIED"), Number: proto.Int32(0)},
+					{Name: new("PLAIN_UNSPECIFIED"), Number: proto.Int32(0)},
 				},
 			},
 		},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Envelope"),
+				Name: new("Envelope"),
 				EnumType: []*descriptorpb.EnumDescriptorProto{
 					{
-						Name:    proto.String("NestedErrorReason"),
+						Name:    new("NestedErrorReason"),
 						Options: defaultOptions,
 						Value: []*descriptorpb.EnumValueDescriptorProto{
-							{Name: proto.String("NESTED_ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
+							{Name: new("NESTED_ERROR_REASON_UNSPECIFIED"), Number: proto.Int32(0)},
 						},
 					},
 				},

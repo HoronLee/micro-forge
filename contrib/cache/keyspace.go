@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"sort"
 	"strings"
@@ -66,10 +66,10 @@ func stableEncode(v any) string {
 	case []string:
 		cp := append([]string(nil), x...)
 		sort.Strings(cp)
-		data, _ := json.Marshal(cp)
+		data, _ := json.Marshal(cp, json.Deterministic(true), json.FormatNilMapAsNull(true), json.FormatNilSliceAsNull(true))
 		return string(data)
 	default:
-		data, _ := json.Marshal(x)
+		data, _ := json.Marshal(x, json.Deterministic(true), json.FormatNilMapAsNull(true), json.FormatNilSliceAsNull(true))
 		return string(data)
 	}
 }

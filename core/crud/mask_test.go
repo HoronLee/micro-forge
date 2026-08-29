@@ -7,7 +7,6 @@ import (
 	crudpb "github.com/Servora-Kit/servora/api/gen/go/servora/crud/v1"
 	examplev1 "github.com/Servora-Kit/servora/api/gen/go/servora/example/v1"
 	"github.com/Servora-Kit/servora/core/crud"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -16,8 +15,8 @@ func TestNormalizeWriteMaskBuildsImplicitPresenceMask(t *testing.T) {
 
 	plan := userResourcePlan()
 	mask, err := plan.NormalizeWriteMask(&examplev1.User{
-		DisplayName: proto.String("Alice"),
-		Nickname:    proto.String(""),
+		DisplayName: new("Alice"),
+		Nickname:    new(""),
 	}, nil)
 	if err != nil {
 		t.Fatalf("NormalizeWriteMask: %v", err)

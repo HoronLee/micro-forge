@@ -2,7 +2,7 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
@@ -55,7 +55,7 @@ func GetOrSetJSON[T any](
 ) (T, error) {
 	return GetOrSet(ctx, c, key, ttl, loader,
 		func(v T) (string, error) {
-			b, err := json.Marshal(v)
+			b, err := json.Marshal(v, json.FormatNilMapAsNull(true), json.FormatNilSliceAsNull(true))
 			return string(b), err
 		},
 		func(s string) (T, error) {

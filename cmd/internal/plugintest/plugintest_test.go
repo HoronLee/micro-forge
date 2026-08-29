@@ -6,7 +6,6 @@ import (
 
 	auditv1 "github.com/Servora-Kit/servora/api/gen/go/servora/audit/v1"
 	"google.golang.org/protobuf/compiler/protogen"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
@@ -34,7 +33,7 @@ func TestResponseFilesAndOnlyGeneratedFile(t *testing.T) {
 	plugin, err := protogen.Options{}.New(&pluginpb.CodeGeneratorRequest{
 		ProtoFile:      DescriptorClosure(auditv1.File_servora_audit_v1_annotations_proto),
 		FileToGenerate: []string{"servora/audit/v1/annotations.proto"},
-		Parameter:      proto.String("paths=source_relative"),
+		Parameter:      new("paths=source_relative"),
 	})
 	if err != nil {
 		t.Fatalf("protogen.Options.New: %v", err)

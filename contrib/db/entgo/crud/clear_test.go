@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	examplev1 "github.com/Servora-Kit/servora/api/gen/go/servora/example/v1"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -27,7 +26,7 @@ func TestClearHelperDefaultsSameNameNullableField(t *testing.T) {
 	}
 
 	mutation = newFakeClearMutation("nickname")
-	resource.Nickname = proto.String("present")
+	resource.Nickname = new("present")
 	if err := helper.Apply(resource, &fieldmaskpb.FieldMask{Paths: []string{"nickname"}}, mutation); err != nil {
 		t.Fatalf("Apply present: %v", err)
 	}
