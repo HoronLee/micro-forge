@@ -108,9 +108,3 @@ func NewNacosDiscovery(c *corev1.Nacos) registry.Discovery {
 	r := nacos.New(client, nacos.WithGroup(group))
 	return r
 }
-
-// NewNacosRegistrar 创建 Nacos 注册中心客户端
-// Deprecated: 使用 NewNacosRegistry 替代
-func NewNacosRegistrar(c *corev1.Nacos) registry.Registrar {
-	return NewNacosRegistry(c)
-}
