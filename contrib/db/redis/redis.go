@@ -5,7 +5,6 @@ import (
 	stdtls "crypto/tls"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"time"
 
@@ -78,36 +77,29 @@ func configFromProto(cfg *redispb.Redis) (*Config, error) {
 }
 
 // New creates a Redis client from the shared Redis configuration, verifies the connection, and returns cleanup.
-func New(cfg *redispb.Redis, l *slog.Logger) (*goredis.Client, func(), error) {
+func New(cfg *redispb.Redis) (*goredis.Client, func(), error) {
 	config, err := configFromProto(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
-	return newClient(config, l)
+	return newClient(config)
 }
 
-func newClient(cfg *Config, l *slog.Logger) (*goredis.Client, func(), error) {
+func newClient(cfg *Config) (*goredis.Client, func(), error) {
 	if cfg == nil {
 		return nil, nil, errors.New("redis config is nil")
 	}
-	if l == nil {
-		l = slog.Default()
-	}
 
-	log := l.With("scope", "redis/contrib")
 	rdb := goredis.NewClient(newRedisOptions(cfg))
 
 	ctx, cancel := context.WithTimeout(context.Background(), rdb.Options().DialTimeout)
 	defer cancel()
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		_ = rdb.Close()
-		log.Error("redis ping failed", "err", err)
 		return nil, nil, fmt.Errorf("redis ping: %w", err)
 	}
-	log.Info("redis client initialized")
 
 	cleanup := func() {
-		log.Info("closing redis connection")
 		_ = rdb.Close()
 	}
 
@@ -138,4 +130,3 @@ func newRedisOptions(cfg *Config) *goredis.Options {
 		TLSConfig:    cfg.TLSConfig,
 	}
 }
-

@@ -12,11 +12,11 @@
 - 默认超时：`Dial=5s`、`Read=3s`、`Write=3s`
 - `New` 直接接收 `servora.contrib.db.redis.v1.Redis`，返回官方 `*redis.Client`，不做黑盒封装
 - `New` 完成配置转换、TLS 构建和 `Ping` 连通性校验，并返回 `cleanup func()`
-- 日志仅在构造期打印（`scope=redis/contrib`），客户端本身不持有 logger，业务日志由调用方自行拼装
+- 不记录构造期生命周期日志；业务日志由调用方自行拼装
 
 ## 暴露能力
 
-- `New(cfg, logger) (*redis.Client, func(), error)`：从 proto 配置构造官方客户端并校验连通性
+- `New(cfg) (*redis.Client, func(), error)`：从 proto 配置构造官方客户端并校验连通性
 - `TryLock(ctx, rdb, key, ttl)` / `Lock.Unlock`：基于 SET NX + Lua 的分布式锁
 - Cache-aside helper 位于 `contrib/cache/redis`
 
@@ -32,7 +32,7 @@ KV 读写直接使用 go-redis 官方 API（`Get`/`Set`/`Del`/…），本包不
 
 ```go
 cfg := &redispb.Redis{Addr: "localhost:6379", Db: 0}
-client, cleanup, err := redis.New(cfg, l)
+client, cleanup, err := redis.New(cfg)
 defer cleanup()
 
 _ = client.Set(context.Background(), "key", "value", time.Hour).Err()

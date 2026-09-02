@@ -14,7 +14,7 @@ func newTestClient(t *testing.T) *goredis.Client {
 	if testing.Short() {
 		t.Skip("skipping: requires Redis")
 	}
-	c, cleanup, err := New(&redispb.Redis{Addr: "localhost:6379", Db: 15}, testSlogLogger())
+	c, cleanup, err := New(&redispb.Redis{Addr: "localhost:6379", Db: 15})
 	if err != nil {
 		t.Skipf("redis not available: %v", err)
 	}

@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -35,7 +33,7 @@ func newTestClient(t *testing.T) *goredis.Client {
 	if testing.Short() {
 		t.Skip("skipping: requires Redis")
 	}
-	c, cleanup, err := dbredis.New(&redispb.Redis{Addr: "localhost:6379", Db: 15}, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	c, cleanup, err := dbredis.New(&redispb.Redis{Addr: "localhost:6379", Db: 15})
 	if err != nil {
 		t.Skipf("redis not available: %v", err)
 	}

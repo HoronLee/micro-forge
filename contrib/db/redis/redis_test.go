@@ -1,8 +1,6 @@
 package redis
 
 import (
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -65,13 +63,12 @@ func TestConfigFromProtoTLSRejectsAddrWithoutPort(t *testing.T) {
 func TestNewClientReportsConnectionFailure(t *testing.T) {
 	t.Parallel()
 
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	client, cleanup, err := newClient(&Config{
 		Addr:         "127.0.0.1:1",
 		DialTimeout:  20 * time.Millisecond,
 		ReadTimeout:  20 * time.Millisecond,
 		WriteTimeout: 20 * time.Millisecond,
-	}, logger)
+	})
 	if err == nil {
 		if cleanup != nil {
 			cleanup()

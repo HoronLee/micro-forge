@@ -19,7 +19,7 @@ import (
 // BuildOpts maps Kafka proto config into franz-go options and appends caller
 // supplied options. Callers can reuse the mapping while adding consumer or
 // producer specific options such as kgo.ConsumerGroup or kgo.ConsumeTopics.
-func BuildOpts(cfg *kafkapb.Kafka, l *slog.Logger, extra ...kgo.Opt) ([]kgo.Opt, error) {
+func BuildOpts(cfg *kafkapb.Kafka, extra ...kgo.Opt) ([]kgo.Opt, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("kafka: config must not be nil")
 	}
@@ -33,9 +33,6 @@ func BuildOpts(cfg *kafkapb.Kafka, l *slog.Logger, extra ...kgo.Opt) ([]kgo.Opt,
 	opts := []kgo.Opt{kgo.SeedBrokers(cfg.GetBrokers()...)}
 	if cfg.GetClientId() != "" {
 		opts = append(opts, kgo.ClientID(cfg.GetClientId()))
-	}
-	if l != nil {
-		opts = append(opts, kgo.WithLogger(slogAdapter{log: l.With("scope", "kafka/contrib")}))
 	}
 
 	if d := cfg.GetDialTimeout(); d != nil && d.AsDuration() > 0 {
@@ -95,8 +92,8 @@ func BuildOpts(cfg *kafkapb.Kafka, l *slog.Logger, extra ...kgo.Opt) ([]kgo.Opt,
 
 // NewClient constructs a franz-go client from Kafka config and validates it
 // with Ping. The caller owns the returned client's Close lifecycle.
-func NewClient(ctx context.Context, cfg *kafkapb.Kafka, l *slog.Logger, extra ...kgo.Opt) (*kgo.Client, error) {
-	opts, err := BuildOpts(cfg, l, extra...)
+func NewClient(ctx context.Context, cfg *kafkapb.Kafka, extra ...kgo.Opt) (*kgo.Client, error) {
+	opts, err := BuildOpts(cfg, extra...)
 	if err != nil {
 		return nil, err
 	}
@@ -113,17 +110,14 @@ func NewClient(ctx context.Context, cfg *kafkapb.Kafka, l *slog.Logger, extra ..
 
 // NewClientOptional returns nil when Kafka is absent. A configured Kafka client
 // must connect successfully, otherwise the error is returned to the owner.
-func NewClientOptional(ctx context.Context, cfg *kafkapb.Kafka, l *slog.Logger, extra ...kgo.Opt) (*kgo.Client, error) {
-	log := loggerOrDefault(l).With("scope", "kafka/contrib")
+func NewClientOptional(ctx context.Context, cfg *kafkapb.Kafka, extra ...kgo.Opt) (*kgo.Client, error) {
 	if cfg == nil || len(cfg.GetBrokers()) == 0 {
-		log.Info("Kafka not configured")
 		return nil, nil
 	}
-	client, err := NewClient(ctx, cfg, l, extra...)
+	client, err := NewClient(ctx, cfg, extra...)
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Kafka connected")
 	return client, nil
 }
 
@@ -179,11 +173,13 @@ func compressionCodec(raw string) (kgo.CompressionCodec, error) {
 	}
 }
 
-func loggerOrDefault(l *slog.Logger) *slog.Logger {
-	if l != nil {
-		return l
+// WithSlogLogger adapts a slog logger to franz-go's native logger option.
+// A nil logger produces a no-op option and does not bind a global logger.
+func WithSlogLogger(l *slog.Logger) kgo.Opt {
+	if l == nil {
+		return kgo.WithHooks()
 	}
-	return slog.Default()
+	return kgo.WithLogger(slogAdapter{log: l})
 }
 
 type slogAdapter struct {
