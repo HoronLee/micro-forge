@@ -9,6 +9,7 @@ package corev1
 import (
 	_ "github.com/Servora-Kit/servora/api/gen/go/servora/conf/v1"
 	v1 "github.com/Servora-Kit/servora/api/gen/go/servora/security/tls/v1"
+	v11 "github.com/Servora-Kit/servora/api/gen/go/servora/transport/http/apidocs/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -1330,6 +1331,7 @@ type Server_HTTP struct {
 	Listen        *Server_Listen         `protobuf:"bytes,1,opt,name=listen,proto3" json:"listen,omitempty"`
 	Tls           *v1.TLS                `protobuf:"bytes,2,opt,name=tls,proto3" json:"tls,omitempty"`
 	Advertise     *Server_Advertise      `protobuf:"bytes,3,opt,name=advertise,proto3" json:"advertise,omitempty"`
+	ApiDocs       *v11.APIDocs           `protobuf:"bytes,4,opt,name=api_docs,json=apiDocs,proto3" json:"api_docs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1381,6 +1383,13 @@ func (x *Server_HTTP) GetTls() *v1.TLS {
 func (x *Server_HTTP) GetAdvertise() *Server_Advertise {
 	if x != nil {
 		return x.Advertise
+	}
+	return nil
+}
+
+func (x *Server_HTTP) GetApiDocs() *v11.APIDocs {
+	if x != nil {
+		return x.ApiDocs
 	}
 	return nil
 }
@@ -2011,14 +2020,14 @@ var File_servora_core_v1_bootstrap_proto protoreflect.FileDescriptor
 
 const file_servora_core_v1_bootstrap_proto_rawDesc = "" +
 	"\n" +
-	"\x1fservora/core/v1/bootstrap.proto\x12\x0fservora.core.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a!servora/conf/v1/annotations.proto\x1a$servora/security/tls/v1/config.proto\"\xa9\x02\n" +
+	"\x1fservora/core/v1/bootstrap.proto\x12\x0fservora.core.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a!servora/conf/v1/annotations.proto\x1a$servora/security/tls/v1/config.proto\x1a.servora/transport/http/apidocs/v1/config.proto\"\xa9\x02\n" +
 	"\tBootstrap\x12&\n" +
 	"\x03app\x18\x01 \x01(\v2\x14.servora.core.v1.AppR\x03app\x12/\n" +
 	"\x06server\x18\x02 \x01(\v2\x17.servora.core.v1.ServerR\x06server\x12)\n" +
 	"\x04data\x18\x03 \x01(\v2\x15.servora.core.v1.DataR\x04data\x125\n" +
 	"\bregistry\x18\x04 \x01(\v2\x19.servora.core.v1.RegistryR\bregistry\x12/\n" +
 	"\x06source\x18\x05 \x01(\v2\x17.servora.core.v1.SourceR\x06source\x120\n" +
-	"\x03obs\x18\x06 \x01(\v2\x1e.servora.core.v1.ObservabilityR\x03obs\"\x8d\x05\n" +
+	"\x03obs\x18\x06 \x01(\v2\x1e.servora.core.v1.ObservabilityR\x03obs\"\xd4\x05\n" +
 	"\x06Server\x120\n" +
 	"\x04http\x18\x01 \x01(\v2\x1c.servora.core.v1.Server.HTTPR\x04http\x120\n" +
 	"\x04grpc\x18\x02 \x01(\v2\x1c.servora.core.v1.Server.GRPCR\x04grpc\x1a~\n" +
@@ -2029,11 +2038,12 @@ const file_servora_core_v1_bootstrap_proto_rawDesc = "" +
 	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\x1a;\n" +
 	"\tAdvertise\x12\x1a\n" +
 	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x12\n" +
-	"\x04host\x18\x02 \x01(\tR\x04host\x1a\xaf\x01\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x1a\xf6\x01\n" +
 	"\x04HTTP\x126\n" +
 	"\x06listen\x18\x01 \x01(\v2\x1e.servora.core.v1.Server.ListenR\x06listen\x12.\n" +
 	"\x03tls\x18\x02 \x01(\v2\x1c.servora.security.tls.v1.TLSR\x03tls\x12?\n" +
-	"\tadvertise\x18\x03 \x01(\v2!.servora.core.v1.Server.AdvertiseR\tadvertise\x1a\xaf\x01\n" +
+	"\tadvertise\x18\x03 \x01(\v2!.servora.core.v1.Server.AdvertiseR\tadvertise\x12E\n" +
+	"\bapi_docs\x18\x04 \x01(\v2*.servora.transport.http.apidocs.v1.APIDocsR\aapiDocs\x1a\xaf\x01\n" +
 	"\x04GRPC\x126\n" +
 	"\x06listen\x18\x01 \x01(\v2\x1e.servora.core.v1.Server.ListenR\x06listen\x12.\n" +
 	"\x03tls\x18\x02 \x01(\v2\x1c.servora.security.tls.v1.TLSR\x03tls\x12?\n" +
@@ -2207,7 +2217,8 @@ var file_servora_core_v1_bootstrap_proto_goTypes = []any{
 	(*Log_NoopBackend)(nil),      // 30: servora.core.v1.Log.NoopBackend
 	(*durationpb.Duration)(nil),  // 31: google.protobuf.Duration
 	(*v1.TLS)(nil),               // 32: servora.security.tls.v1.TLS
-	(*structpb.Struct)(nil),      // 33: google.protobuf.Struct
+	(*v11.APIDocs)(nil),          // 33: servora.transport.http.apidocs.v1.APIDocs
+	(*structpb.Struct)(nil),      // 34: google.protobuf.Struct
 }
 var file_servora_core_v1_bootstrap_proto_depIdxs = []int32{
 	6,  // 0: servora.core.v1.Bootstrap.app:type_name -> servora.core.v1.App
@@ -2240,26 +2251,27 @@ var file_servora_core_v1_bootstrap_proto_depIdxs = []int32{
 	17, // 27: servora.core.v1.Server.HTTP.listen:type_name -> servora.core.v1.Server.Listen
 	32, // 28: servora.core.v1.Server.HTTP.tls:type_name -> servora.security.tls.v1.TLS
 	18, // 29: servora.core.v1.Server.HTTP.advertise:type_name -> servora.core.v1.Server.Advertise
-	17, // 30: servora.core.v1.Server.GRPC.listen:type_name -> servora.core.v1.Server.Listen
-	32, // 31: servora.core.v1.Server.GRPC.tls:type_name -> servora.security.tls.v1.TLS
-	18, // 32: servora.core.v1.Server.GRPC.advertise:type_name -> servora.core.v1.Server.Advertise
-	23, // 33: servora.core.v1.Data.Client.services:type_name -> servora.core.v1.Data.Client.Service
-	24, // 34: servora.core.v1.Data.Client.Service.endpoints:type_name -> servora.core.v1.Data.Client.Endpoint
-	31, // 35: servora.core.v1.Data.Client.Endpoint.timeout:type_name -> google.protobuf.Duration
-	32, // 36: servora.core.v1.Data.Client.Endpoint.tls:type_name -> servora.security.tls.v1.TLS
-	33, // 37: servora.core.v1.Data.Client.Endpoint.options:type_name -> google.protobuf.Struct
-	27, // 38: servora.core.v1.Log.LogBackend.stdout:type_name -> servora.core.v1.Log.StdoutBackend
-	28, // 39: servora.core.v1.Log.LogBackend.file:type_name -> servora.core.v1.Log.FileBackend
-	29, // 40: servora.core.v1.Log.LogBackend.otel:type_name -> servora.core.v1.Log.OtelBackend
-	30, // 41: servora.core.v1.Log.LogBackend.noop:type_name -> servora.core.v1.Log.NoopBackend
-	1,  // 42: servora.core.v1.Log.StdoutBackend.format:type_name -> servora.core.v1.Log.LogFormat
-	1,  // 43: servora.core.v1.Log.FileBackend.format:type_name -> servora.core.v1.Log.LogFormat
-	2,  // 44: servora.core.v1.Log.OtelBackend.protocol:type_name -> servora.core.v1.Log.OtelProtocol
-	45, // [45:45] is the sub-list for method output_type
-	45, // [45:45] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	33, // 30: servora.core.v1.Server.HTTP.api_docs:type_name -> servora.transport.http.apidocs.v1.APIDocs
+	17, // 31: servora.core.v1.Server.GRPC.listen:type_name -> servora.core.v1.Server.Listen
+	32, // 32: servora.core.v1.Server.GRPC.tls:type_name -> servora.security.tls.v1.TLS
+	18, // 33: servora.core.v1.Server.GRPC.advertise:type_name -> servora.core.v1.Server.Advertise
+	23, // 34: servora.core.v1.Data.Client.services:type_name -> servora.core.v1.Data.Client.Service
+	24, // 35: servora.core.v1.Data.Client.Service.endpoints:type_name -> servora.core.v1.Data.Client.Endpoint
+	31, // 36: servora.core.v1.Data.Client.Endpoint.timeout:type_name -> google.protobuf.Duration
+	32, // 37: servora.core.v1.Data.Client.Endpoint.tls:type_name -> servora.security.tls.v1.TLS
+	34, // 38: servora.core.v1.Data.Client.Endpoint.options:type_name -> google.protobuf.Struct
+	27, // 39: servora.core.v1.Log.LogBackend.stdout:type_name -> servora.core.v1.Log.StdoutBackend
+	28, // 40: servora.core.v1.Log.LogBackend.file:type_name -> servora.core.v1.Log.FileBackend
+	29, // 41: servora.core.v1.Log.LogBackend.otel:type_name -> servora.core.v1.Log.OtelBackend
+	30, // 42: servora.core.v1.Log.LogBackend.noop:type_name -> servora.core.v1.Log.NoopBackend
+	1,  // 43: servora.core.v1.Log.StdoutBackend.format:type_name -> servora.core.v1.Log.LogFormat
+	1,  // 44: servora.core.v1.Log.FileBackend.format:type_name -> servora.core.v1.Log.LogFormat
+	2,  // 45: servora.core.v1.Log.OtelBackend.protocol:type_name -> servora.core.v1.Log.OtelProtocol
+	46, // [46:46] is the sub-list for method output_type
+	46, // [46:46] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_servora_core_v1_bootstrap_proto_init() }

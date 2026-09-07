@@ -75,6 +75,19 @@ func NewGRPCServer(c *corev1.Server, l *slog.Logger, svc *UserService) *kgrpc.Se
 }
 ```
 
+#### API 文档（Scalar）
+
+通过现有 `svrhttp.WithConfig(c.Http)` 自动挂载 Scalar 文档，配置中显式开启即可：
+
+```yaml
+server:
+  http:
+    api_docs:
+      enable: true
+```
+
+默认读取进程工作目录下的 `api/internal/assets/openapi.yaml`；访问 `/docs/` 查看文档，`/docs/openapi.yaml` 获取原文。未开启时不读取文件或暴露文档。
+
 ### 客户端
 
 Servora 提供了极为方便的 HTTP、gRPC 客户端的浅层封装。`Dialer` 内部接管服务发现、负载均衡、连接池与中间件链，业务侧仅需 `Dial(ctx, "service.name")`。

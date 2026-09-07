@@ -12,8 +12,8 @@ import (
 
 	svrtls "github.com/Servora-Kit/servora/security/tls"
 	"github.com/Servora-Kit/servora/transport/server/endpoint"
+	"github.com/Servora-Kit/servora/transport/server/http/apidocs"
 	"github.com/Servora-Kit/servora/transport/server/http/cors"
-	"github.com/Servora-Kit/servora/transport/server/http/swagger"
 )
 
 func NewServer(opts ...ServerOption) *khttp.Server {
@@ -78,6 +78,11 @@ func NewServer(opts ...ServerOption) *khttp.Server {
 		serverOpts = append(serverOpts, khttp.Filter(cors.Middleware(o.cors)))
 	}
 
+	docs, err := apidocs.NewHandler(o.conf.GetApiDocs())
+	if err != nil {
+		panic(fmt.Errorf("server.http.api_docs: %w", err))
+	}
+
 	srv := khttp.NewServer(serverOpts...)
 
 	if o.metricsHandler != nil {
@@ -89,8 +94,11 @@ func NewServer(opts ...ServerOption) *khttp.Server {
 		srv.HandleFunc("/readyz", o.healthHandler.ReadinessHandler())
 	}
 
-	if len(o.swaggerSpec) > 0 {
-		swagger.Register(srv, o.swaggerSpec, o.swaggerOpts...)
+	if docs != nil {
+		base := docs.BasePath()
+		// 子树先匹配，避免 StrictSlash 将文档页面重定向到无斜线地址。
+		srv.HandlePrefix(base+"/", docs)
+		srv.Handle(base, docs)
 	}
 
 	for _, reg := range o.registrars {

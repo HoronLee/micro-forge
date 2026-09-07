@@ -267,7 +267,7 @@ func emitApplyDefaults(g *protogen.GeneratedFile, m *protogen.Message, entries [
 		}
 	}
 	for _, f := range regular {
-		childType := f.Message.GoIdent.GoName
+		childType := g.QualifiedGoIdent(f.Message.GoIdent)
 		g.P("	if m.", f.GoName, " == nil {")
 		g.P("		m.", f.GoName, " = &", childType, "{}")
 		g.P("	}")

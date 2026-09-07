@@ -7,7 +7,6 @@ import (
 	corsv1 "github.com/Servora-Kit/servora/api/gen/go/servora/transport/http/cors/v1"
 	"github.com/Servora-Kit/servora/obs/metrics"
 	"github.com/Servora-Kit/servora/transport/server/http/health"
-	"github.com/Servora-Kit/servora/transport/server/http/swagger"
 	"github.com/go-kratos/kratos/v3/middleware"
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
 )
@@ -23,8 +22,6 @@ type serverOptions struct {
 	metricsHandler http.Handler
 	registrars     []Registrar
 	healthHandler  *health.Handler
-	swaggerSpec    []byte
-	swaggerOpts    []swagger.Option
 }
 
 func WithConfig(c *corev1.Server_HTTP) ServerOption {
@@ -64,14 +61,5 @@ func WithServices(registrars ...Registrar) ServerOption {
 func WithHealthCheck(h *health.Handler) ServerOption {
 	return func(o *serverOptions) {
 		o.healthHandler = h
-	}
-}
-
-// WithSwagger 启用 Swagger UI 文档端点。
-// 注册 GET /docs/ (UI 页面) 和 GET /docs/openapi.yaml (原始 spec) 路由。
-func WithSwagger(specData []byte, opts ...swagger.Option) ServerOption {
-	return func(o *serverOptions) {
-		o.swaggerSpec = specData
-		o.swaggerOpts = opts
 	}
 }

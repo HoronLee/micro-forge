@@ -5,6 +5,7 @@ package corev1
 
 import (
 	fmt "fmt"
+	v1 "github.com/Servora-Kit/servora/api/gen/go/servora/transport/http/apidocs/v1"
 )
 
 // ApplyDefaults populates zero-valued fields on Bootstrap with the literal
@@ -240,6 +241,10 @@ func (m *Server_HTTP) ApplyDefaults() {
 		m.Listen = &Server_Listen{}
 	}
 	m.Listen.ApplyDefaults()
+	if m.ApiDocs == nil {
+		m.ApiDocs = &v1.APIDocs{}
+	}
+	m.ApiDocs.ApplyDefaults()
 }
 
 // CheckRequired reports the first required-but-missing field on Server_HTTP.

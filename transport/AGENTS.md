@@ -13,7 +13,7 @@
 transport/
 ├── client/                   # Dialer（grpc/http/middleware）+ endpoint 索引
 └── server/                   # NewServer（grpc/http/middleware）+ endpoint/accept
-                              # http/ 含 cors/swagger/health 子包
+                              # http/ 含 cors/apidocs/health 子包
 ```
 
 ## 当前实现事实

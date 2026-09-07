@@ -1,6 +1,13 @@
 package http
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +18,9 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	corev1 "github.com/Servora-Kit/servora/api/gen/go/servora/core/v1"
+	apidocsv1 "github.com/Servora-Kit/servora/api/gen/go/servora/transport/http/apidocs/v1"
 	corsv1 "github.com/Servora-Kit/servora/api/gen/go/servora/transport/http/cors/v1"
+	bootstrapconfig "github.com/Servora-Kit/servora/core/bootstrap/config"
 	"github.com/Servora-Kit/servora/transport/server/http/health"
 )
 
@@ -273,5 +282,124 @@ func TestNewServer_WithAdvertiseEndpoint_EndpointUsesExplicitValue(t *testing.T)
 	}
 	if got, want := ep.String(), "https://example.internal:18443?isSecure=true"; got != want {
 		t.Fatalf("expected endpoint %q, got %q", want, got)
+	}
+}
+
+func TestNewServer_APIDocsFromConfig(t *testing.T) {
+	document := []byte("openapi: 3.1.0\ninfo: {title: Orders, version: '1'}\npaths: {}\n")
+	c := &corev1.Server_HTTP{ApiDocs: &apidocsv1.APIDocs{
+		Enable:    true,
+		BasePath:  "/api-docs",
+		Documents: []*apidocsv1.Document{{Source: &apidocsv1.Document_Data{Data: document}}},
+	}}
+	srv := NewServer(WithConfig(c), WithServices(func(s *khttp.Server) {
+		s.HandleFunc("/api-docs-other", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("business"))
+		})
+	}))
+	for _, tc := range []struct {
+		path   string
+		status int
+		body   string
+	}{
+		{"/api-docs/", http.StatusOK, ""},
+		{"/api-docs/openapi.yaml", http.StatusOK, string(document)},
+		{"/api-docs/missing", http.StatusNotFound, ""},
+		{"/api-docs-other", http.StatusOK, "business"},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			srv.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
+			if w.Code != tc.status || (tc.body != "" && w.Body.String() != tc.body) {
+				t.Fatalf("response = %d %q, want %d %q", w.Code, w.Body.String(), tc.status, tc.body)
+			}
+		})
+	}
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api-docs?view=api", nil))
+	location, err := w.Result().Location()
+	if err != nil || w.Code < 300 || w.Code >= 400 || location.String() != "api-docs/?view=api" {
+		t.Fatalf("redirect = %d %v, error = %v", w.Code, location, err)
+	}
+}
+
+func TestNewServer_APIDocsDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []ServerOption
+	}{
+		{"absent", nil},
+		{"nil", []ServerOption{WithConfig(nil)}},
+		{"disabled with invalid path", []ServerOption{WithConfig(&corev1.Server_HTTP{ApiDocs: &apidocsv1.APIDocs{Path: "missing", BasePath: "invalid"}})}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := NewServer(tc.opts...)
+			for _, path := range []string{"/docs/", "/docs/openapi.yaml"} {
+				w := httptest.NewRecorder()
+				srv.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+				if w.Code != http.StatusNotFound {
+					t.Fatalf("disabled document %s: status = %d", path, w.Code)
+				}
+			}
+		})
+	}
+}
+
+func TestNewServer_APIDocsConfigurationFailure(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "missing.yaml")
+	defer func() {
+		err, ok := recover().(error)
+		if !ok || !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), file) || !strings.Contains(err.Error(), "server.http.api_docs") {
+			t.Fatalf("missing enabled document must fail construction with context: %v", err)
+		}
+	}()
+	NewServer(WithConfig(&corev1.Server_HTTP{ApiDocs: &apidocsv1.APIDocs{Enable: true, Path: file}}))
+}
+
+func TestNewServer_APIDocsBootstrapConfiguration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, tc := range []struct {
+		name, docs string
+		enabled    bool
+	}{
+		{"dev does not imply enabled", "", false},
+		{"explicitly disabled", "    api_docs:\n      enable: false\n      path: missing.yaml\n", false},
+		{"enabled with explicit false sidebar", "    api_docs:\n      enable: true\n      scalar:\n        show_sidebar: false\n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "bootstrap.yaml")
+			data := fmt.Sprintf("app:\n  env: dev\nserver:\n  http:\n    listen:\n      addr: '127.0.0.1:0'\n%s", tc.docs)
+			if err := os.WriteFile(configPath, []byte(data), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			bc, cfg, err := bootstrapconfig.LoadBootstrap(configPath, "docs.service", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = cfg.Close() })
+			document := []byte("openapi: 3.1.0\ninfo: {title: Generated config, version: '1'}\npaths: {}\n")
+			if tc.enabled {
+				if err := os.MkdirAll("api/internal/assets", 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile("api/internal/assets/openapi.yaml", document, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				scalar := bc.GetServer().GetHttp().GetApiDocs().GetScalar()
+				if scalar == nil || scalar.ShowSidebar == nil || *scalar.ShowSidebar {
+					t.Fatal("explicit false was lost during config loading/defaults")
+				}
+			}
+			srv := NewServer(WithConfig(bc.GetServer().GetHttp()))
+			w := httptest.NewRecorder()
+			srv.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/docs/openapi.yaml", nil))
+			if tc.enabled {
+				if w.Code != http.StatusOK || w.Body.String() != string(document) {
+					t.Fatalf("configured document = %d %q", w.Code, w.Body.String())
+				}
+			} else if w.Code != http.StatusNotFound {
+				t.Fatalf("disabled docs = %d", w.Code)
+			}
+		})
 	}
 }

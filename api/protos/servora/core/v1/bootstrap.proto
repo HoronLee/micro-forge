@@ -6,6 +6,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "servora/conf/v1/annotations.proto";
 import "servora/security/tls/v1/config.proto";
+import "servora/transport/http/apidocs/v1/config.proto";
 
 option go_package = "github.com/Servora-Kit/servora/api/gen/go/servora/core/v1;corev1";
 
@@ -37,6 +38,7 @@ message Server {
     Listen listen = 1;
     servora.security.tls.v1.TLS tls = 2;
     Advertise advertise = 3;
+    servora.transport.http.apidocs.v1.APIDocs api_docs = 4;
   }
 
   message GRPC {

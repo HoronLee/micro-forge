@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package servora.transport.http.apidocs.v1;
+
+import "google/protobuf/struct.proto";
+import "servora/conf/v1/annotations.proto";
+
+option go_package = "github.com/Servora-Kit/servora/api/gen/go/servora/transport/http/apidocs/v1;apidocsv1";
+
+// APIDocs 是 HTTP Server 的可选文档配置；未开启时不读取文件或挂载路由。
+message APIDocs {
+  bool enable = 1;
+  // 相对于进程工作目录；documents 非空时完整替代此来源。
+  string path = 2 [(servora.conf.v1.field) = {default: "./api/internal/assets/openapi.yaml"}];
+  string base_path = 3 [(servora.conf.v1.field) = {default: "/docs"}];
+  string title = 4 [(servora.conf.v1.field) = {default: "API Documentation"}];
+  // 断网部署可指定同源或自托管脚本地址。
+  string script_url = 5 [(servora.conf.v1.field) = {default: "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.67.0/dist/browser/standalone.js"}];
+  repeated Document documents = 6;
+  Scalar scalar = 7;
+}
+
+// Document 按列表顺序展示，第一份默认选中；多份文档的 slug 必须非空且唯一。
+message Document {
+  string slug = 1;
+  string title = 2;
+  // 显式来源不能为空；URL 由浏览器读取，Go 服务不代理。
+  oneof source {
+    string path = 3;
+    string url = 4;
+    bytes data = 5;
+  }
+}
+
+// Scalar 定义常用界面配置。所有字段会公开给文档访问者，不得包含服务端秘密。
+message Scalar {
+  string theme = 1 [(servora.conf.v1.field) = {default: "default"}];
+  // 支持 modern、classic。
+  string layout = 2 [(servora.conf.v1.field) = {default: "modern"}];
+  // 未设置时使用 Scalar 自身的模式；显式 false 必须保留。
+  optional bool dark_mode = 3;
+  optional bool show_sidebar = 4;
+  string search_hot_key = 5 [(servora.conf.v1.field) = {default: "k"}];
+  bool hide_test_request_button = 6;
+  bool telemetry = 7;
+  bool persist_auth = 8;
+  bool with_default_fonts = 9;
+  // 缺省不使用公共请求代理。
+  string proxy_url = 10;
+  // 使用 Scalar 原生 JSON 字段名；禁止覆盖来源和上面的强类型字段。
+  google.protobuf.Struct extra = 11;
+}
