@@ -238,7 +238,11 @@ func TestGatewayRedirectPreservesPrefixAndQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close page response: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK || resp.Request.URL.RequestURI() != "/gateway/reference/?view=api&tag=a%2Fb" {
 		t.Fatalf("redirect landed at %s with %d", resp.Request.URL, resp.StatusCode)
 	}
@@ -247,7 +251,11 @@ func TestGatewayRedirectPreservesPrefixAndQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer spec.Body.Close()
+	defer func() {
+		if err := spec.Body.Close(); err != nil {
+			t.Errorf("close document response: %v", err)
+		}
+	}()
 	body, err := io.ReadAll(spec.Body)
 	if err != nil {
 		t.Fatal(err)
