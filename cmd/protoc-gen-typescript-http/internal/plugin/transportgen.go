@@ -1,8 +1,6 @@
 package plugin
 
 import (
-	"strings"
-
 	"github.com/Servora-Kit/servora/cmd/protoc-gen-typescript-http/internal/codegen"
 	"github.com/Servora-Kit/servora/cmd/protoc-gen-typescript-http/internal/httprule"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -24,7 +22,7 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 	f.P(t(2), "meta: TransportMeta,")
 	f.P(t(1), "): Promise<T>;")
 	f.P(t(1), "serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;")
-	f.P(t(1), "duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;")
+	f.P(t(1), "duplexStream<TIn, TOut>(path: string, meta: TransportMeta, encode?: (data: TIn) => unknown): DuplexStream<TIn, TOut>;")
 	f.P("}")
 	f.P()
 	f.P("export interface ServerStream<T> {")
@@ -35,6 +33,7 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 	f.P()
 	f.P("export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {")
 	f.P(t(1), "send(data: TIn): void;")
+	f.P(t(1), "closeSend(): void;")
 	f.P("}")
 	f.P()
 	f.P("function encodePathSegment(value: unknown): string {")
@@ -59,7 +58,7 @@ func generateStreamInterfaceMethod(f *codegen.File, pkg protoreflect.FullName, m
 	input := typeFromMessage(pkg, method.Input())
 	output := typeFromMessage(pkg, method.Output())
 	if method.IsStreamingClient() {
-		if hasPathVariables(rule) {
+		if bidiStreamUsesRequest(rule, method.Input()) {
 			f.P(t(1), method.Name(), "(")
 			f.P(t(2), "request: ", input.Reference(), ",")
 			f.P(t(1), "): DuplexStream<", input.Reference(), ", ", output.Reference(), ">;")
@@ -80,7 +79,7 @@ func generateStreamClientMethod(
 	rule httprule.Rule,
 ) {
 	if method.IsStreamingClient() {
-		generateBidiStreamMethod(f, method, rule)
+		generateBidiStreamMethod(f, pkg, method, rule)
 	} else {
 		generateServerStreamMethod(f, pkg, method, rule)
 	}
@@ -118,63 +117,75 @@ func generateServerStreamMethod(
 
 func generateBidiStreamMethod(
 	f *codegen.File,
+	pkg protoreflect.FullName,
 	method protoreflect.MethodDescriptor,
 	rule httprule.Rule,
 ) {
-	if hasPathVariables(rule) {
-		generateBidiStreamWithParams(f, method, rule)
+	input := typeFromMessage(pkg, method.Input())
+	output := typeFromMessage(pkg, method.Output())
+	usesRequest := bidiStreamUsesRequest(rule, method.Input())
+	if usesRequest {
+		f.P(t(2), method.Name(), "(request) {")
+		generateMethodPathValidation(f, method.Input(), rule)
 	} else {
-		generateBidiStreamLiteral(f, method, rule)
+		f.P(t(2), method.Name(), "() {")
 	}
-}
-
-func generateBidiStreamLiteral(
-	f *codegen.File,
-	method protoreflect.MethodDescriptor,
-	rule httprule.Rule,
-) {
-	path := literalPath(rule)
-	f.P(t(2), method.Name(), "() {")
-	f.P(t(3), "const path = ", path, ";")
-	f.P(t(3), "return transport.duplexStream(path, {")
-	f.P(t(4), "service: '", method.Parent().Name(), "',")
-	f.P(t(4), "method: '", method.Name(), "',")
-	f.P(t(3), "});")
-	f.P(t(2), "},")
-}
-
-func generateBidiStreamWithParams(
-	f *codegen.File,
-	method protoreflect.MethodDescriptor,
-	rule httprule.Rule,
-) {
-	f.P(t(2), method.Name(), "(request) {")
-	generateMethodPathValidation(f, method.Input(), rule)
 	generateMethodPath(f, method.Input(), rule)
-	f.P(t(3), "return transport.duplexStream(path, {")
-	f.P(t(4), "service: '", method.Parent().Name(), "',")
-	f.P(t(4), "method: '", method.Name(), "',")
-	f.P(t(3), "});")
+	uriVar := generateStreamURI(f, method.Input(), rule)
+	generateBidiStreamReturn(f, method, rule, input, output, uriVar)
 	f.P(t(2), "},")
 }
 
-func literalPath(rule httprule.Rule) string {
-	parts := make([]string, 0, len(rule.Template.Segments))
-	for _, seg := range rule.Template.Segments {
-		switch seg.Kind {
-		case httprule.SegmentKindLiteral:
-			parts = append(parts, seg.Literal)
-		case httprule.SegmentKindMatchSingle:
-			parts = append(parts, "*")
-		case httprule.SegmentKindMatchMultiple:
-			parts = append(parts, "**")
-		}
+func generateStreamURI(
+	f *codegen.File,
+	input protoreflect.MessageDescriptor,
+	rule httprule.Rule,
+) string {
+	if !generateMethodQuery(f, input, rule) {
+		return "path"
 	}
-	path := strings.Join(parts, "/")
-	if rule.Template.Verb != "" {
-		path += ":" + rule.Template.Verb
+	f.P(t(3), "let uri = path;")
+	f.P(t(3), "if (queryParams.length > 0) {")
+	f.P(t(4), "uri += `?${queryParams.join('&')}`;")
+	f.P(t(3), "}")
+	return "uri"
+}
+
+func generateBidiStreamReturn(
+	f *codegen.File,
+	method protoreflect.MethodDescriptor,
+	rule httprule.Rule,
+	input Type,
+	output Type,
+	uriVar string,
+) {
+	f.P(t(3), "return transport.duplexStream<", input.Reference(), ", ", output.Reference(), ">(", uriVar, ", {")
+	f.P(t(4), "service: '", method.Parent().Name(), "',")
+	f.P(t(4), "method: '", method.Name(), "',")
+	if bodyPath := streamBodyJSONPath(method.Input(), rule); bodyPath != "" {
+		f.P(t(3), "}, (data) => data.", bodyPath, ");")
+		return
 	}
-	return tsSingleQuote(path)
+	f.P(t(3), "});")
+}
+
+func streamBodyJSONPath(input protoreflect.MessageDescriptor, rule httprule.Rule) string {
+	if rule.Body == "" || rule.Body == "*" {
+		return ""
+	}
+	bodyField := input.Fields().ByName(protoreflect.Name(rule.Body))
+	if bodyField == nil {
+		Warn("流式 HTTP 规则引用的 body 字段 %q 不存在于消息 %s，回退为完整请求", rule.Body, input.FullName())
+		return ""
+	}
+	if bodyField.Kind() != protoreflect.MessageKind || bodyField.IsList() || bodyField.IsMap() {
+		return ""
+	}
+	return bodyField.JSONName()
+}
+
+func bidiStreamUsesRequest(rule httprule.Rule, input protoreflect.MessageDescriptor) bool {
+	return hasPathVariables(rule) || hasQueryParams(input, rule)
 }
 
 func hasPathVariables(rule httprule.Rule) bool {

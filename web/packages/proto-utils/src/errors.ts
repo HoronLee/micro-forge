@@ -1,4 +1,4 @@
-export type ApiErrorKind = "http" | "network" | "timeout";
+export type ApiErrorKind = "http" | "network" | "timeout" | "cancelled";
 
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;

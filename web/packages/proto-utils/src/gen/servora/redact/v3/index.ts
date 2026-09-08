@@ -39,39 +39,38 @@ function encodeMultiSegmentPath(value: unknown): string {
     .join('/');
 }
 
-export type Kafka = {
-  brokers?: string[];
-  clientId?: string;
-  compression?: string;
-  consumerGroup?: string;
-  dialTimeout?: wellKnownDuration;
-  readTimeout?: wellKnownDuration;
-  requiredAcks?: number;
-  retryBackoff?: wellKnownDuration;
-  retryMax?: number;
-  sasl?: Kafka_SASL;
-  tls?: servorasecuritytlsv1_TLS;
-  writeTimeout?: wellKnownDuration;
+export type FieldRules = {
+  bool?: boolean;
+  bytes?: string;
+  double?: number;
+  element?: ElementRules;
+  enum?: number;
+  fixed32?: number;
+  fixed64?: string;
+  float?: number;
+  int32?: number;
+  int64?: string;
+  message?: MessageRules;
+  sfixed32?: number;
+  sfixed64?: string;
+  sint32?: number;
+  sint64?: string;
+  string?: string;
+  uint32?: number;
+  uint64?: string;
 };
 
-// Generated output always contains 0, 3, 6, or 9 fractional digits,
-// depending on required precision, followed by the suffix "s".
-// Accepted are any fractional digits (also none) as long as they fit
-// into nano-seconds precision and the suffix "s" is required.
-type wellKnownDuration = string;
-
-export type servorasecuritytlsv1_TLS = {
-  caPath?: string;
-  certPath?: string;
-  enable?: boolean;
-  keyPath?: string;
+export type MessageRules = {
+  apply?: boolean;
+  empty?: boolean;
+  nil?: boolean;
+  skip?: boolean;
 };
 
-// SASL 认证配置（可选）。
-export type Kafka_SASL = {
-  mechanism?: string;
-  password?: string;
-  username?: string;
+export type ElementRules = {
+  empty?: boolean;
+  item?: FieldRules;
+  nested?: boolean;
 };
 
 

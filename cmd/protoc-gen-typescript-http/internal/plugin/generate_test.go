@@ -1,6 +1,9 @@
 package plugin
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,6 +70,98 @@ func TestGenerateEncodesHTTPPathVariablesByTemplateShape(t *testing.T) {
 	assert.Contains(t, output, "function encodeMultiSegmentPath(value: unknown): string {")
 	assert.NotContains(t, output, "const path = `v1/${request.name}`;")
 	assert.NotContains(t, output, "const path = `v1/users/${request.id}`;")
+}
+
+func TestGenerateEmitsStreamingTransportContract(t *testing.T) {
+	output := generateContractFixture(t)
+
+	assert.Contains(t, output, "duplexStream<TIn, TOut>(path: string, meta: TransportMeta, encode?: (data: TIn) => unknown): DuplexStream<TIn, TOut>;")
+	assert.Contains(t, output, "closeSend(): void;")
+}
+
+func TestGeneratedBidiStreamBehavior(t *testing.T) {
+	output := generateContractFixture(t)
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("未安装 Node.js，跳过生成客户端行为测试")
+	}
+
+	script := output + `
+type CapturedCall = {
+  path: string;
+  meta: { service: string; method: string };
+  frames: unknown[];
+  closeSendCount: number;
+};
+
+const calls: CapturedCall[] = [];
+const transport: ClientTransport = {
+  async unary<T>(): Promise<T> {
+    throw new Error('本测试不调用普通请求');
+  },
+  serverStream<T>(): ServerStream<T> {
+    throw new Error('本测试不调用服务端流');
+  },
+  duplexStream<TIn, TOut>(
+    path: string,
+    meta: { service: string; method: string },
+    encode?: (data: TIn) => unknown,
+  ): DuplexStream<TIn, TOut> {
+    const call: CapturedCall = { path, meta, frames: [], closeSendCount: 0 };
+    calls.push(call);
+    return {
+      send(data: TIn) {
+        call.frames.push(encode ? encode(data) : data);
+      },
+      closeSend() {
+        call.closeSendCount++;
+      },
+      onEvent() {
+        return () => {};
+      },
+      onError() {},
+      close() {},
+    };
+  },
+};
+
+function assertEqual(actual: unknown, expected: unknown, label: string): void {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(label + ': ' + JSON.stringify(actual));
+  }
+}
+
+const client = createContractServiceClient(transport);
+const named = client.SyncNamed({
+  parent: 'tenants/acme team',
+  payload: { int64Value: '9223372036854775807' },
+  filter: 'enabled & ready',
+  pageSize: 25,
+});
+named.send({ payload: { int64Value: '42' } });
+named.closeSend();
+assertEqual(calls[0], {
+  path: 'v1/tenants/acme%20team/sync?filter=enabled%20%26%20ready&pageSize=25',
+  meta: { service: 'ContractService', method: 'SyncNamed' },
+  frames: [{ int64Value: '42' }],
+  closeSendCount: 1,
+}, '命名 body、URL、查询参数或半关闭转发错误');
+
+const fullFrame = { parent: 'ignored', payload: { int64Value: '84' }, filter: 'ignored' };
+const full = client.SyncAll();
+full.send(fullFrame);
+assertEqual(calls[1].frames, [fullFrame], '完整消息帧被错误映射');
+
+const bodyOnly = client.SyncBodyOnly();
+bodyOnly.send({ payload: { int64Value: '126' } });
+assertEqual(calls[2].frames, [{ int64Value: '126' }], '无 URL 绑定的命名 body 映射错误');
+`
+
+	file := filepath.Join(t.TempDir(), "generated-stream.test.ts")
+	require.NoError(t, os.WriteFile(file, []byte(script), 0o600))
+	command := exec.Command(node, file)
+	combined, err := command.CombinedOutput()
+	require.NoErrorf(t, err, "生成客户端行为执行失败：%s", combined)
 }
 
 func generateContractFixture(t *testing.T) string {
@@ -160,6 +255,21 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 		},
 	}
 
+	streamRequest := &descriptorpb.DescriptorProto{
+		Name: new("StreamRequest"),
+		Field: []*descriptorpb.FieldDescriptorProto{
+			scalarField("parent", 1, descriptorpb.FieldDescriptorProto_TYPE_STRING),
+			messageField("payload", 2, ".test.v1.Payload"),
+			scalarField("filter", 3, descriptorpb.FieldDescriptorProto_TYPE_STRING),
+			scalarField("page_size", 4, descriptorpb.FieldDescriptorProto_TYPE_INT32),
+		},
+	}
+	bodyOnlyStreamRequest := &descriptorpb.DescriptorProto{
+		Name: new("BodyOnlyStreamRequest"),
+		Field: []*descriptorpb.FieldDescriptorProto{
+			messageField("payload", 1, ".test.v1.Payload"),
+		},
+	}
 	return &descriptorpb.FileDescriptorProto{
 		Name:       new("test/v1/contract.proto"),
 		Package:    new("test.v1"),
@@ -168,6 +278,8 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 		MessageType: []*descriptorpb.DescriptorProto{
 			request,
 			createRequest,
+			streamRequest,
+			bodyOnlyStreamRequest,
 			payload,
 		},
 		Service: []*descriptorpb.ServiceDescriptorProto{
@@ -177,6 +289,9 @@ func contractFixtureDescriptor() *descriptorpb.FileDescriptorProto {
 					httpMethod("GetNested", "/v1/{name=tenants/*/users/*}"),
 					httpMethod("GetSingle", "/v1/users/{id}"),
 					httpPostMethod("Create", "/v1/users", "payload", ".test.v1.CreateRequest"),
+					bidiHTTPPostMethod("SyncNamed", "/v1/{parent=tenants/*}/sync", "payload", ".test.v1.StreamRequest"),
+					bidiHTTPPostMethod("SyncAll", "/v1/sync-all", "*", ".test.v1.StreamRequest"),
+					bidiHTTPPostMethod("SyncBodyOnly", "/v1/sync-body", "payload", ".test.v1.BodyOnlyStreamRequest"),
 				},
 			},
 		},
@@ -233,6 +348,13 @@ func httpPostMethod(name, path, body, input string) *descriptorpb.MethodDescript
 		OutputType: new(".test.v1.Payload"),
 		Options:    options,
 	}
+}
+
+func bidiHTTPPostMethod(name, path, body, input string) *descriptorpb.MethodDescriptorProto {
+	method := httpPostMethod(name, path, body, input)
+	method.ClientStreaming = new(true)
+	method.ServerStreaming = new(true)
+	return method
 }
 
 func descriptorClosure(files ...protoreflect.FileDescriptor) []*descriptorpb.FileDescriptorProto {

@@ -14,7 +14,7 @@ export interface ClientTransport {
     meta: TransportMeta,
   ): Promise<T>;
   serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
-  duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
+  duplexStream<TIn, TOut>(path: string, meta: TransportMeta, encode?: (data: TIn) => unknown): DuplexStream<TIn, TOut>;
 }
 
 export interface ServerStream<T> {
@@ -25,6 +25,7 @@ export interface ServerStream<T> {
 
 export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {
   send(data: TIn): void;
+  closeSend(): void;
 }
 
 function encodePathSegment(value: unknown): string {

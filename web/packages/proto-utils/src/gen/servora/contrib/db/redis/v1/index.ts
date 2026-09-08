@@ -14,7 +14,7 @@ export interface ClientTransport {
     meta: TransportMeta,
   ): Promise<T>;
   serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
-  duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
+  duplexStream<TIn, TOut>(path: string, meta: TransportMeta, encode?: (data: TIn) => unknown): DuplexStream<TIn, TOut>;
 }
 
 export interface ServerStream<T> {
@@ -25,6 +25,7 @@ export interface ServerStream<T> {
 
 export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {
   send(data: TIn): void;
+  closeSend(): void;
 }
 
 function encodePathSegment(value: unknown): string {
@@ -45,6 +46,7 @@ export type Redis = {
   network?: string;
   password?: string;
   readTimeout?: wellKnownDuration;
+  tls?: servorasecuritytlsv1_TLS;
   userName?: string;
   writeTimeout?: wellKnownDuration;
 };
@@ -54,6 +56,13 @@ export type Redis = {
 // Accepted are any fractional digits (also none) as long as they fit
 // into nano-seconds precision and the suffix "s" is required.
 type wellKnownDuration = string;
+
+export type servorasecuritytlsv1_TLS = {
+  caPath?: string;
+  certPath?: string;
+  enable?: boolean;
+  keyPath?: string;
+};
 
 
 // @@protoc_insertion_point(typescript-http-eof)

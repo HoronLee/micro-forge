@@ -14,7 +14,7 @@ export interface ClientTransport {
     meta: TransportMeta,
   ): Promise<T>;
   serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
-  duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
+  duplexStream<TIn, TOut>(path: string, meta: TransportMeta, encode?: (data: TIn) => unknown): DuplexStream<TIn, TOut>;
 }
 
 export interface ServerStream<T> {
@@ -25,6 +25,7 @@ export interface ServerStream<T> {
 
 export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {
   send(data: TIn): void;
+  closeSend(): void;
 }
 
 function encodePathSegment(value: unknown): string {
@@ -64,6 +65,7 @@ export type Server = {
 
 export type Server_HTTP = {
   advertise?: Server_Advertise;
+  apiDocs?: servoratransporthttpapidocsv1_APIDocs;
   listen?: Server_Listen;
   tls?: servorasecuritytlsv1_TLS;
 };
@@ -93,6 +95,50 @@ export type Server_Advertise = {
   endpoint?: string;
   host?: string;
 };
+
+// APIDocs 是 HTTP Server 的可选文档配置；未开启时不读取文件或挂载路由。
+export type servoratransporthttpapidocsv1_APIDocs = {
+  basePath?: string;
+  documents?: servoratransporthttpapidocsv1_Document[];
+  enable?: boolean;
+  // 相对于进程工作目录；documents 非空时完整替代此来源。
+  path?: string;
+  scalar?: servoratransporthttpapidocsv1_Scalar;
+  // 断网部署可指定同源或自托管脚本地址。
+  scriptUrl?: string;
+  title?: string;
+};
+
+// Document 按列表顺序展示，第一份默认选中；多份文档的 slug 必须非空且唯一。
+export type servoratransporthttpapidocsv1_Document = {
+  data?: string;
+  path?: string;
+  slug?: string;
+  title?: string;
+  url?: string;
+};
+
+// Scalar 定义常用界面配置。所有字段会公开给文档访问者，不得包含服务端秘密。
+export type servoratransporthttpapidocsv1_Scalar = {
+  // 未设置时使用 Scalar 自身的模式；显式 false 必须保留。
+  darkMode?: boolean;
+  // 使用 Scalar 原生 JSON 字段名；禁止覆盖来源和上面的强类型字段。
+  extra?: wellKnownStruct;
+  hideTestRequestButton?: boolean;
+  // 支持 modern、classic。
+  layout?: string;
+  persistAuth?: boolean;
+  // 缺省不使用公共请求代理。
+  proxyUrl?: string;
+  searchHotKey?: string;
+  showSidebar?: boolean;
+  telemetry?: boolean;
+  theme?: string;
+  withDefaultFonts?: boolean;
+};
+
+// Any JSON value.
+type wellKnownStruct = Record<string, unknown>;
 
 export type Server_GRPC = {
   advertise?: Server_Advertise;
@@ -127,9 +173,6 @@ export type Data_Client_Endpoint = {
   timeout?: wellKnownDuration;
   tls?: servorasecuritytlsv1_TLS;
 };
-
-// Any JSON value.
-type wellKnownStruct = Record<string, unknown>;
 
 // 注册中心配置
 export type Registry = {

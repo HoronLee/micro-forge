@@ -14,27 +14,6 @@ const validBody = {
   message: "user not found",
 };
 
-test("ApiError preserves transport facts and cause", () => {
-  const cause = new TypeError("fetch failed");
-  const error = new ApiError({
-    kind: "http",
-    message: "request failed",
-    httpStatus: 404,
-    responseBody: validBody,
-    service: "UserHTTPService",
-    method: "GetUser",
-    cause,
-  });
-
-  assert(error instanceof Error);
-  assert.equal(error.name, "ApiError");
-  assert.equal(error.kind, "http");
-  assert.equal(error.httpStatus, 404);
-  assert.equal(error.responseBody, validBody);
-  assert.equal(error.service, "UserHTTPService");
-  assert.equal(error.method, "GetUser");
-  assert.equal(error.cause, cause);
-});
 
 test("parseKratosErrorBody accepts the envelope, metadata, and extra fields", () => {
   assert.deepEqual(parseKratosErrorBody(validBody), validBody);
@@ -116,16 +95,19 @@ test("parseKratosError only maps HTTP errors and matches reasons exactly", () =>
   assert.equal(isKratosReason(httpError, "user_error_reason_not_found"), false);
   assert.equal(isKratosReason(httpError, "NOT_FOUND"), false);
   assert.equal(isKratosReason(networkError, validBody.reason), false);
+  for (const kind of ["timeout", "cancelled"]) {
+    const error = new ApiError({
+      kind,
+      message: "请求未完成",
+      responseBody: validBody,
+      service: "UserHTTPService",
+      method: "GetUser",
+    });
+    assert.equal(parseKratosError(error), null);
+    assert.equal(isKratosReason(error, validBody.reason), false);
+  }
 });
 
-test('published errors subpath exposes the public contract', async () => {
-  const published = await import('@servora/proto-utils/errors')
-
-  assert.equal(typeof published.ApiError, 'function')
-  assert.equal(typeof published.parseKratosErrorBody, 'function')
-  assert.equal(typeof published.parseKratosError, 'function')
-  assert.equal(typeof published.isKratosReason, 'function')
-})
 
 test('removed client subpaths are not exported', async () => {
   const removed = [

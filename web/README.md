@@ -45,6 +45,8 @@ try {
 
 `@servora/proto-utils/errors` 只描述已经发生的错误。它不发送请求、不刷新令牌、不重放 401 请求、不识别 Axios/ofetch 错误，也不决定 Toast 和用户可见文案。
 
+`ApiError.kind` 区分 `http`、`network`、`timeout` 与 `cancelled`，并保留 `service`、`method` 和原始 `cause`；只有 HTTP 响应错误参与 Kratos reason 解析。
+
 启用 `protoc-gen-go-errors target=ts` 后，错误 sidecar 会从同目录 `index.ts` 复用 Proto enum 联合类型，并生成同名运行时对象与精确 guard。框架 reason 通过语义化子路径公开：
 
 ```typescript
